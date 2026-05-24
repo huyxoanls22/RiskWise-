@@ -1,0 +1,1108 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { PortfolioTrade, ChecklistItem, DailyLimitLog } from '../types';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Trash2, 
+  DollarSign, 
+  Plus, 
+  Minus, 
+  AlertTriangle, 
+  CheckCircle2, 
+  X, 
+  Smile, 
+  Frown,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Award,
+  BookOpen,
+  Scale,
+  Calendar,
+  Layers,
+  Percent,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react';
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
+import { FOREX_PAIRS } from '../utils/calculator';
+
+interface PortfolioTrackerProps {
+  activeTrades: PortfolioTrade[];
+  closedTrades: PortfolioTrade[];
+  onCloseTrade: (id: string, outcome: 'won' | 'lost', finalPrice?: number) => void;
+  onDeleteClosedTrade: (id: string) => void;
+  onClearHistory: () => void;
+  onUpdateCurrentPrice: (id: string, price: number) => void;
+  onUpdateTrailingStop: (id: string, price: number | undefined) => void;
+  onLogTrade: (trade: Omit<PortfolioTrade, 'id' | 'pnl' | 'status' | 'enteredAt'>) => void;
+  accountBalance: number;
+  dailyDisciplineLogs: DailyLimitLog[];
+  onClearDisciplineLogs?: () => void;
+}
+
+export default function PortfolioTracker({
+  activeTrades,
+  closedTrades,
+  onCloseTrade,
+  onDeleteClosedTrade,
+  onClearHistory,
+  onUpdateCurrentPrice,
+  onUpdateTrailingStop,
+  onLogTrade,
+  accountBalance,
+  dailyDisciplineLogs,
+  onClearDisciplineLogs
+}: PortfolioTrackerProps) {
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [tempPrice, setTempPrice] = useState<string>('');
+  const [editingTrailingId, setEditingTrailingId] = useState<string | null>(null);
+  const [tempTrailing, setTempTrailing] = useState<string>('');
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [showResetLogsModal, setShowResetLogsModal] = useState(false);
+  const [resetPhraseInput, setResetPhraseInput] = useState('');
+
+  // Sector Risk calculation
+  const totalActiveRisk = activeTrades.reduce((sum, t) => sum + t.riskAmount, 0);
+
+  // Group active trades by sector
+  const sectorGroups: { [sector: string]: { trades: PortfolioTrade[], totalRisk: number } } = {};
+  
+  activeTrades.forEach(t => {
+    const sectorName = t.sector || 'Chưa phân loại';
+    if (!sectorGroups[sectorName]) {
+      sectorGroups[sectorName] = { trades: [], totalRisk: 0 };
+    }
+    sectorGroups[sectorName].trades.push(t);
+    sectorGroups[sectorName].totalRisk += t.riskAmount;
+  });
+
+  // Equity Curve data preparation
+  const getEquityData = () => {
+    const formatTime = (isoString: string) => {
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return 'Ban đầu';
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day}/${month} ${hours}:${minutes}`;
+      } catch {
+        return 'Ban đầu';
+      }
+    };
+
+    if (closedTrades.length === 0) {
+      return [
+        { name: 'Khởi đầu', time: 'Ban đầu', Balance: accountBalance, PnL: 0 },
+        { name: 'Hiện tại', time: 'Hiện tại', Balance: accountBalance, PnL: 0 }
+      ];
+    }
+
+    // Sort closed trades older first (chronologically by enteredAt date)
+    const sortedClosed = [...closedTrades].sort((a, b) => {
+      return new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
+    });
+
+    // Starting balance = accountBalance configured by the user
+    let currentBalAccumulator = accountBalance || 10000;
+
+    const dataPoints = [
+      {
+        name: 'Vốn Ban Đầu',
+        time: 'Gốc',
+        Balance: parseFloat(currentBalAccumulator.toFixed(2)),
+        PnL: 0
+      }
+    ];
+
+    sortedClosed.forEach((trade, index) => {
+      const pnlValue = trade.status === 'won' ? Math.abs(trade.pnl) : -Math.abs(trade.pnl);
+      currentBalAccumulator += pnlValue;
+
+      const formattedLabel = formatTime(trade.enteredAt);
+
+      dataPoints.push({
+        name: `${trade.ticker} (#${index + 1})`,
+        time: formattedLabel,
+        Balance: parseFloat(currentBalAccumulator.toFixed(2)),
+        PnL: parseFloat(pnlValue.toFixed(2))
+      });
+    });
+
+    return dataPoints;
+  };
+
+  const equityData = getEquityData();
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const point = payload[0].payload;
+      const isPnLNotZero = point.PnL !== undefined && point.PnL !== 0;
+      return (
+        <div className="bg-[#1C212D] border border-slate-700/80 p-3.5 rounded-xl shadow-2xl font-sans text-xs">
+          <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider mb-1.5">{point.name}</p>
+          <div className="space-y-1.5">
+            <div className="flex justify-between gap-4">
+              <span className="text-slate-400">Số dư:</span>
+              <span className="font-mono font-bold text-white">${point.Balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            {isPnLNotZero && (
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-400">Kết quả:</span>
+                <span className={`font-mono font-bold ${point.PnL >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                  {point.PnL >= 0 ? '+' : ''}${point.PnL.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Auto price simulation effect
+  useEffect(() => {
+    if (!isSimulating || activeTrades.length === 0) return;
+
+    const interval = setInterval(() => {
+      activeTrades.forEach(trade => {
+        // Shift price slightly (between -0.15% to +0.15%)
+        const percentageShift = (Math.random() * 0.3 - 0.15) / 100;
+        const currentPrice = trade.currentPrice;
+        const newPrice = currentPrice * (1 + percentageShift);
+        
+        // Match base decimals to avoid floating point noise
+        const precision = currentPrice > 100 ? 2 : (currentPrice > 1 ? 4 : 6);
+        onUpdateCurrentPrice(trade.id, parseFloat(newPrice.toFixed(precision)));
+      });
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [isSimulating, activeTrades, onUpdateCurrentPrice]);
+
+  // Calculate stats
+  const totalActivePnl = activeTrades.reduce((sum, t) => sum + t.pnl, 0);
+  const winCount = closedTrades.filter(t => t.status === 'won').length;
+  const lossCount = closedTrades.filter(t => t.status === 'lost').length;
+  const totalClosedCount = closedTrades.length;
+  const winRate = totalClosedCount > 0 ? (winCount / totalClosedCount) * 100 : 0;
+  const totalRealizedPnl = closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+
+  // Expected Value (EV) calculation: (WinRate * AvgWin) - (LossRate * AvgLoss)
+  const getEV = () => {
+    if (totalClosedCount === 0) return { val: 0, formatted: 'N/A' };
+    
+    const wins = closedTrades.filter(t => t.status === 'won');
+    const losses = closedTrades.filter(t => t.status === 'lost');
+    
+    const avgWin = wins.length > 0 ? wins.reduce((sum, t) => sum + Math.abs(t.pnl), 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? losses.reduce((sum, t) => sum + Math.abs(t.pnl), 0) / losses.length : 0;
+    
+    const pWin = winCount / totalClosedCount;
+    const pLoss = 1 - pWin;
+    
+    const evValue = (pWin * avgWin) - (pLoss * avgLoss);
+    return { 
+      val: evValue, 
+      formatted: `${evValue >= 0 ? '+' : ''}$${evValue.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}` 
+    };
+  };
+  const ev = getEV();
+
+  const startEditing = (trade: PortfolioTrade) => {
+    setEditingPriceId(trade.id);
+    setTempPrice(trade.currentPrice.toString());
+  };
+
+  const savePriceEdit = (id: string) => {
+    const parsed = parseFloat(tempPrice);
+    if (!isNaN(parsed) && parsed > 0) {
+      onUpdateCurrentPrice(id, parsed);
+    }
+    setEditingPriceId(null);
+  };
+
+  const startEditingTrailing = (trade: PortfolioTrade) => {
+    setEditingTrailingId(trade.id);
+    setTempTrailing(trade.trailingStopPrice !== undefined ? trade.trailingStopPrice.toString() : '');
+  };
+
+  const saveTrailingEdit = (id: string) => {
+    if (tempTrailing === '') {
+      onUpdateTrailingStop(id, undefined);
+    } else {
+      const parsed = parseFloat(tempTrailing);
+      if (!isNaN(parsed) && parsed > 0) {
+        onUpdateTrailingStop(id, parsed);
+      }
+    }
+    setEditingTrailingId(null);
+  };
+
+  return (
+    <div id="portfolio-tracker-container" className="space-y-6">
+      
+      {/* Portfolio overview blocks */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        
+        {/* Floating Active PnL */}
+        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative">
+          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tổng Lợi nhuận Thả nổi</span>
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <span className={`text-2xl font-black font-mono tracking-tight ${
+              totalActivePnl >= 0 ? 'text-emerald-400' : 'text-rose-500'
+            }`}>
+              {totalActivePnl >= 0 ? '+' : ''}${totalActivePnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-450 mt-1">Dựa trên vị thế mở hoạt động.</p>
+        </div>
+
+        {/* Realized PnL */}
+        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative">
+          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tổng Lời/Lỗ Thực tế</span>
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <span className={`text-2xl font-black font-mono tracking-tight ${
+              totalRealizedPnl >= 0 ? 'text-emerald-400' : 'text-rose-500'
+            }`}>
+              {totalRealizedPnl >= 0 ? '+' : ''}${totalRealizedPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-450 mt-1">Từ các vị thế đã đóng chốt.</p>
+        </div>
+
+        {/* Win Rate */}
+        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative">
+          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tỉ lệ Thắng (Win Rate)</span>
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <span className="text-2xl font-black font-mono text-yellow-500 tracking-tight">
+              {winRate.toFixed(1)}%
+            </span>
+            <span className="text-xs text-slate-500 font-mono">({winCount}/{totalClosedCount} lệnh)</span>
+          </div>
+          <p className="text-[10px] text-slate-450 mt-1">Kỷ luật càng cao, tỉ lệ thắng càng cải thiện.</p>
+        </div>
+
+        {/* Expected Value (EV) */}
+        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative animate-fadeIn">
+          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Kỳ Vọng Toán Học (EV)</span>
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            <span className={`text-2xl font-black font-mono tracking-tight ${
+              ev.val > 0 ? 'text-emerald-400' : ev.val < 0 ? 'text-rose-500' : 'text-slate-400'
+            }`}>
+              {ev.formatted}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-450 mt-1">Lợi nhuận mong đợi trung bình mỗi vị thế.</p>
+        </div>
+
+        {/* Discipline index */}
+        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative animate-fadeIn col-span-2 lg:col-span-1">
+          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider font-sans">Kỷ Luật Indicator</span>
+          <div className="mt-2.5 flex items-baseline gap-1.5">
+            {activeTrades.length === 0 ? (
+              <span className="text-lg font-bold text-slate-550 font-sans">Không vị thế mở</span>
+            ) : (
+              (() => {
+                const undisciplined = activeTrades.filter(t => t.uncheckedWarning).length;
+                const pct = ((activeTrades.length - undisciplined) / activeTrades.length) * 100;
+                return (
+                  <>
+                    <span className={`text-2xl font-black font-mono tracking-tight ${
+                      pct >= 80 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-rose-500'
+                    }`}>
+                      {pct.toFixed(0)}%
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-sans">Giao dịch chuẩn</span>
+                  </>
+                );
+              })()
+            )}
+          </div>
+          <p className="text-[10px] text-slate-450 mt-1">Tỉ lệ phần trăm lệnh vào đủ điều kiện.</p>
+        </div>
+
+      </div>
+
+      {/* Visual Analytics Grid: Equity Curve & Sector Risk Allocation */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-6 animate-fadeIn">
+        {/* Equity Curve Chart - Spans 8 cols */}
+        <div className="lg:col-span-8 bg-[#14171F] border border-slate-800 rounded-2xl p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 pb-2 border-b border-slate-800/80 gap-3">
+            <div>
+              <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-indigo-400" />
+                Đường Cong Vốn (Equity Curve) &amp; Biến Động Số Dư
+              </h4>
+              <p className="text-[10px] text-slate-500 mt-1 font-sans font-medium">Lịch sử số dư biến động thực tế dựa trên thứ tự chốt lệnh đã thực hiện</p>
+            </div>
+            
+            <div className="text-left sm:text-right">
+              <span className="text-[9px] block text-slate-500 uppercase tracking-wider font-extrabold font-mono">Tài khoản Quy chiếu</span>
+              <span className="font-mono text-xs font-black text-indigo-455">${accountBalance.toLocaleString('en-US', { minimumFractionDigits: 1 })}</span>
+            </div>
+          </div>
+
+          <div className="h-[210px] w-full mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={equityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" opacity={0.3} vertical={false} />
+                <XAxis 
+                  dataKey="time" 
+                  stroke="#475569" 
+                  fontSize={8} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  dy={10}
+                />
+                <YAxis 
+                  stroke="#475569" 
+                  fontSize={8} 
+                  tickLine={false} 
+                  axisLine={false}
+                  domain={['auto', 'auto']}
+                  tickFormatter={(val) => `$${val.toLocaleString()}`}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Area 
+                  type="monotone" 
+                  dataKey="Balance" 
+                  stroke="#6366f1" 
+                  strokeWidth={2.5} 
+                  fillOpacity={1} 
+                  fill="url(#equityGradient)" 
+                  activeDot={{ r: 5, strokeWidth: 0, fill: '#818cf8' }} 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Sector Risk Breakdown - Spans 4 cols */}
+        <div className="lg:col-span-4 bg-[#14171F] border border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-800/80">
+              <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-1.5 leading-none">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                Rủi Ro Các Nhóm Ngành
+              </h4>
+            </div>
+
+            {activeTrades.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center h-[140px]">
+                <span className="text-base mb-1.5 opacity-60">📊</span>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Không có rủi ro mở</p>
+                <p className="text-[9px] text-slate-550 mt-1 max-w-[200px] leading-normal font-sans">Khi bạn vào lệnh Stock/Crypto, tỷ trọng rủi ro sẽ tự động được kiểm soát tại đây.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 mt-1 max-h-[175px] overflow-y-auto pr-1 scrollbar-none">
+                {Object.entries(sectorGroups).map(([sector, group]) => {
+                  const sectorPctOfTotal = totalActiveRisk > 0 ? (group.totalRisk / totalActiveRisk) * 100 : 100;
+                  return (
+                    <div key={sector} className="space-y-1">
+                      <div className="flex justify-between items-center text-[10px] font-bold">
+                        <span className="text-slate-350 font-sans truncate pr-2 max-w-[140px]" title={sector}>{sector}</span>
+                        <div className="flex gap-1 font-mono shrink-0">
+                          <span className="text-slate-500">(${Math.round(group.totalRisk)})</span>
+                          <span className="text-indigo-400">{sectorPctOfTotal.toFixed(0)}%</span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-[#1C212D] h-1.5 rounded-full overflow-hidden flex">
+                        <div 
+                          className="bg-indigo-500 h-full rounded-full transition-all duration-300" 
+                          style={{ width: `${sectorPctOfTotal}%` }}
+                        />
+                      </div>
+                      <div className="text-[9px] text-slate-500 font-sans flex justify-between pr-0.5">
+                        <span>Risk: {accountBalance > 0 ? ((group.totalRisk / accountBalance) * 100).toFixed(2) : '0.00'}% vốn</span>
+                        <span>Đóng góp: {sectorPctOfTotal.toFixed(0)}% tổng risk</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          
+          <div className="pt-2.5 border-t border-slate-800/80 mt-4 space-y-1">
+            <div className="flex justify-between text-[10px] text-slate-450 font-bold uppercase">
+              <span>Tổng % Risk đang mở:</span>
+              <span className="font-mono text-indigo-400 font-bold text-xs">{accountBalance > 0 ? ((totalActiveRisk / accountBalance) * 100).toFixed(2) : '0.00'}% vốn</span>
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-450 font-bold uppercase">
+              <span>Tổng số tiền risk ở các ngành:</span>
+              <span className="font-mono text-emerald-400 font-bold text-xs">${totalActiveRisk.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Control Tools for Open Positions */}
+      <div className="flex items-center justify-between mt-6 pb-2 border-b border-slate-805">
+        <div>
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+            Các Vị Thế Giao Dịch Đang Mở ({activeTrades.length})
+          </h3>
+        </div>
+        
+        {activeTrades.length > 0 && (
+          <button
+            onClick={() => setIsSimulating(!isSimulating)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition flex items-center gap-1.5 cursor-pointer ${
+              isSimulating 
+                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/50 hover:bg-emerald-950/60' 
+                : 'bg-indigo-950/30 text-indigo-400 border border-indigo-900/50 hover:bg-indigo-950/50'
+            }`}
+          >
+            <Play className={`w-3.5 h-3.5 fill-current ${isSimulating ? 'animate-spin' : ''}`} />
+            {isSimulating ? 'Đang mô phỏng giá chạy...' : 'Mô phỏng thị trường thực'}
+          </button>
+        )}
+      </div>
+
+      {/* Active Trades Table/List */}
+      <div className="space-y-4">
+        {activeTrades.length === 0 ? (
+          <div className="text-center py-10 border border-dashed border-slate-800 rounded-2xl bg-[#14171F]/25">
+            <RotateCcw className="w-8 h-8 text-slate-650 mx-auto mb-2" />
+            <p className="text-xs text-slate-450">Không có vị thế giao dịch mở nào.</p>
+            <p className="text-[10px] text-slate-500 mt-1 max-w-sm mx-auto">
+              Hãy dùng bộ tính toán vị thế ở tab trước, hoàn tất checklist và bấm "Lưu lệnh & Kích hoạt theo dõi" để lưu lại lệnh tại đây.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-slate-800/80 bg-[#14171F]">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-805/85 bg-[#1C212D]/40 text-slate-400 uppercase font-mono tracking-wider font-semibold">
+                  <th className="p-3">Mã / Ticker</th>
+                  <th className="p-3">Loại / Chiều</th>
+                  <th className="p-3">Khối lượng</th>
+                  <th className="p-3">Mức Giá Vào</th>
+                  <th className="p-3">Trailing Stop</th>
+                  <th className="p-3">Stop Loss</th>
+                  <th className="p-3">Giá Chốt Lời</th>
+                  <th className="p-3">Rủi ro (% Ngành)</th>
+                  <th className="p-3">Giá Hiện Tại</th>
+                  <th className="p-3">Lợi Nhuận (PnL)</th>
+                  <th className="p-3">Lợi Nhuận Thực Tế</th>
+                  <th className="p-3">Tính Kỷ Luật</th>
+                  <th className="p-3 text-right">Hành động chốt</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-805/60 text-slate-350 font-sans">
+                {activeTrades.map((t) => {
+                  const isLong = t.direction === 'long';
+                  return (
+                    <tr key={t.id} className="hover:bg-slate-850/20 transition-all font-medium">
+                      {/* Ticker & Sector */}
+                      <td className="p-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-mono font-bold text-slate-100">{t.ticker}</span>
+                          <span className="text-[10px] text-indigo-455 font-bold uppercase tracking-tight">{t.sector || 'Chưa phân loại'}</span>
+                        </div>
+                      </td>
+                      
+                      {/* Direction / Asset Class */}
+                      <td className="p-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`text-[10px] font-bold uppercase ${isLong ? 'text-emerald-400' : 'text-rose-500'}`}>
+                            {isLong ? 'Long (Mua)' : 'Short (Bán)'}
+                          </span>
+                          <span className="text-[9px] text-slate-500 uppercase">{t.assetClass}</span>
+                        </div>
+                      </td>
+
+                      {/* Size (Lots or Units) */}
+                      <td className="p-3 font-mono">
+                        {t.assetClass === 'forex' ? (
+                          <div className="flex flex-col">
+                            <span className="text-white font-bold">{t.lots} Lots</span>
+                            <span className="text-[9px] text-slate-500">{(t.units).toLocaleString()} units</span>
+                          </div>
+                        ) : (
+                          <span className="text-white font-bold">{(t.units).toLocaleString()} Units</span>
+                        )}
+                      </td>
+
+                      {/* Entry Price */}
+                      <td className="p-3 font-mono text-slate-300">{t.entryPrice.toLocaleString()}</td>
+
+                      {/* Trailing Stop Column */}
+                      <td className="p-3">
+                        {editingTrailingId === t.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              step="any"
+                              value={tempTrailing}
+                              onChange={(e) => setTempTrailing(e.target.value)}
+                              placeholder="Trống"
+                              className="w-20 bg-[#1C212D] border border-slate-705 text-xs text-center rounded-lg text-white font-mono p-1"
+                            />
+                            <button
+                              onClick={() => saveTrailingEdit(t.id)}
+                              className="bg-indigo-600 p-1 rounded-md text-white hover:bg-indigo-500 cursor-pointer font-bold"
+                              title="Lưu"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => setEditingTrailingId(null)}
+                              className="bg-slate-800 p-1 rounded-md text-slate-400 hover:bg-slate-700 cursor-pointer"
+                              title="Huỷ"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            {t.trailingStopPrice !== undefined && t.trailingStopPrice !== null ? (
+                              <span className="font-mono text-indigo-300 font-bold">{t.trailingStopPrice.toLocaleString()}</span>
+                            ) : (
+                              <span className="font-mono text-slate-600 italic">Chưa đặt</span>
+                            )}
+                            <button
+                              onClick={() => startEditingTrailing(t)}
+                              title="Sửa Trailing Stop"
+                              className="text-[10px] underline text-indigo-455 hover:text-indigo-400 hover:bg-slate-800/60 px-1 py-0.5 rounded cursor-pointer font-sans"
+                            >
+                              Sửa
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* SL */}
+                      <td className="p-3 font-mono text-slate-400">{t.stopLoss}</td>
+
+                      {/* Giá chốt lời */}
+                      <td className="p-3 font-mono text-emerald-400 font-bold">{t.takeProfit || 'Chưa cài'}</td>
+
+                      {/* Risk % Sector */}
+                      <td className="p-3 font-mono">
+                        {(() => {
+                          const sectorName = t.sector || 'Chưa phân loại';
+                          const totalSectorRisk = sectorGroups[sectorName]?.totalRisk || t.riskAmount;
+                          const sectorRiskPercent = totalSectorRisk > 0 ? (t.riskAmount / totalSectorRisk) * 100 : 100;
+                          return (
+                            <div className="flex flex-col">
+                              <span className="text-white font-bold">${t.riskAmount.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</span>
+                              <span className="text-[9px] text-slate-500 font-sans font-medium">
+                                Chiếm <span className="text-indigo-400 font-bold">{sectorRiskPercent.toFixed(0)}%</span> ngành
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Editable Current Price */}
+                      <td className="p-3">
+                        {editingPriceId === t.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              step="any"
+                              value={tempPrice}
+                              onChange={(e) => setTempPrice(e.target.value)}
+                              className="w-20 bg-[#1C212D] border border-slate-705 text-xs text-center rounded-lg text-white font-mono p-1"
+                            />
+                            <button
+                              onClick={() => savePriceEdit(t.id)}
+                              className="bg-emerald-600 p-1 rounded-md text-white hover:bg-emerald-505 cursor-pointer"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => setEditingPriceId(null)}
+                              className="bg-slate-800 p-1 rounded-md text-slate-400 hover:bg-slate-700 cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-indigo-300 font-bold">{t.currentPrice.toLocaleString()}</span>
+                            <button
+                              onClick={() => startEditing(t)}
+                              title="Sửa giá thị trường để test PnL"
+                              className="text-[10px] underline text-indigo-455 hover:text-indigo-400 hover:bg-slate-800/60 px-1 py-0.5 rounded cursor-pointer font-sans"
+                            >
+                              Sửa
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Floating PnL */}
+                      <td className="p-3 font-mono">
+                        <span className={`font-bold text-sm ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                          {t.pnl >= 0 ? '+' : ''}${t.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </td>
+
+                      {/* Secured/Locked Realized Profit via Trailing Stop Column */}
+                      <td className="p-3">
+                        {(() => {
+                          if (t.trailingStopPrice === undefined || t.trailingStopPrice === null) {
+                            return <span className="font-mono text-slate-600 italic">Chưa đặt TS</span>;
+                          }
+                          
+                          let lockedPnl = 0;
+                          const isLong = t.direction === 'long';
+                          
+                          if (t.assetClass === 'forex') {
+                            const pairConfig = FOREX_PAIRS.find(p => p.symbol === t.ticker);
+                            const pipSize = pairConfig?.pipSize || 0.0001;
+                            const pipValLot = t.lots !== undefined ? (FOREX_PAIRS.find(p => p.symbol === t.ticker)?.defaultPipValueUSD || 10) : 10;
+                            
+                            const pipsDiff = (t.trailingStopPrice - t.entryPrice) / pipSize;
+                            const multiplier = isLong ? 1 : -1;
+                            
+                            lockedPnl = pipsDiff * (t.lots || 0) * pipValLot * multiplier;
+                          } else {
+                            const priceDiff = isLong ? (t.trailingStopPrice - t.entryPrice) : (t.entryPrice - t.trailingStopPrice);
+                            lockedPnl = priceDiff * t.units;
+                          }
+                          
+                          const roundedLocked = Math.round(lockedPnl * 100) / 100;
+                          
+                          if (roundedLocked <= 0) {
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-mono text-slate-500 font-semibold">$0.00</span>
+                                <span className="text-[9px] text-slate-600 font-sans italic">Chưa khóa lời</span>
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono text-emerald-400 font-bold">
+                                +${roundedLocked.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[9px] text-emerald-500/80 font-bold font-sans">Đã khóa lời</span>
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Warning Warning status */}
+                      <td className="p-3">
+                        {t.uncheckedWarning ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-rose-950/40 border border-rose-900/40 text-rose-400 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                            <AlertTriangle className="w-2.5 h-2.5 text-rose-400" />
+                            Thiếu Kỷ Luật
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-emerald-950/40 border border-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                            Đúng Kỷ Luật
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions: close choices */}
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => onCloseTrade(t.id, 'won')}
+                            className="bg-emerald-900/50 text-emerald-300 hover:bg-emerald-800/60 px-2 py-1 text-[10px] rounded-lg border border-emerald-850 cursor-pointer font-extrabold transition"
+                          >
+                            ✓ WIN
+                          </button>
+                          <button
+                            onClick={() => onCloseTrade(t.id, 'lost')}
+                            className="bg-rose-900/50 text-rose-300 hover:bg-rose-800/60 px-2 py-1 text-[10px] rounded-lg border border-rose-850 cursor-pointer font-extrabold transition"
+                          >
+                            ✕ LOSS
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* HISTORIC CLOSED TRADES SECTION */}
+      <div id="closed-trades-history-section" className="space-y-4 pt-4 mt-8">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-805">
+          <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
+            <Award className="w-4 h-4 text-yellow-500" />
+            Lịch sử Giao dịch đã Chốt ({closedTrades.length})
+          </h3>
+          {closedTrades.length > 0 && (
+            <button
+              onClick={onClearHistory}
+              className="text-[10px] text-slate-500 hover:text-rose-450 transition font-semibold cursor-pointer underline flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" />
+              Xóa lịch sử đã chốt
+            </button>
+          )}
+        </div>
+
+        {closedTrades.length === 0 ? (
+          <div className="text-center py-8 border border-dashed border-slate-800 rounded-2xl bg-[#14171F]/15">
+            <BookOpen className="w-6 h-6 text-slate-700 mx-auto mb-1.5" />
+            <p className="text-[11px] text-slate-500">Chưa có kết quả lịch sử lệnh đóng nào.</p>
+          </div>
+        ) : (
+          <div className="bg-[#14171F] border border-slate-800/65 rounded-2xl overflow-hidden pr-2">
+            <div className="max-h-72 overflow-y-auto divide-y divide-slate-805">
+              {closedTrades.map((t) => {
+                const isWon = t.status === 'won';
+                const formattedDate = new Date(t.enteredAt).toLocaleDateString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  day: 'numeric',
+                  month: 'short'
+                });
+
+                return (
+                  <div key={t.id} className="p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs hover:bg-[#1C212D]/20 transition-all">
+                    
+                    {/* Basic specs */}
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl border flex items-center justify-center shrink-0 ${
+                        isWon 
+                          ? 'bg-emerald-950/35 border-emerald-900/30 text-emerald-400' 
+                          : 'bg-rose-950/35 border-rose-900/30 text-rose-400'
+                      }`}>
+                        {isWon ? <Smile className="w-4.5 h-4.5" /> : <Frown className="w-4.5 h-4.5" />}
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-200 text-sm font-mono">{t.ticker}</span>
+                          <span className="text-[10px] text-indigo-450 font-bold uppercase">({t.sector || 'Chưa phân loại'})</span>
+                          <span className={`text-[9px] font-bold uppercase rounded px-1.5 border ${
+                            t.direction === 'long' 
+                              ? 'bg-emerald-955/20 text-emerald-400 border-emerald-900/40' 
+                              : 'bg-rose-955/20 text-rose-400 border-rose-900/40'
+                          }`}>
+                            {t.direction === 'long' ? 'Mua' : 'Bán'}
+                          </span>
+                          <span className="text-[9px] text-slate-500 block font-mono">{formattedDate}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-450 mt-1">
+                          Vào: <span className="text-slate-350 font-mono font-bold">${t.entryPrice.toLocaleString()}</span> • 
+                          Giá đóng: <span className="text-slate-350 font-mono font-bold">${t.currentPrice.toLocaleString()}</span> • 
+                          Quy mô: <span className="text-slate-350 font-mono">{t.assetClass === 'forex' ? `${t.lots} Lots` : `${t.units.toLocaleString()} Units`}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Outcome P&L and warning */}
+                    <div className="flex items-center sm:text-right flex-row sm:flex-col gap-2 sm:gap-1.5 justify-start w-full sm:w-auto self-stretch sm:self-center">
+                      <div className="flex items-baseline gap-1 sm:justify-end">
+                        <span className={`font-mono font-extrabold text-sm ${isWon ? 'text-emerald-400' : 'text-rose-500'}`}>
+                          {isWon ? '+' : '-'}${Math.abs(t.pnl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Warning badges */}
+                      <div className="flex gap-1">
+                        {t.uncheckedWarning && (
+                          <span className="text-[8px] bg-amber-950/30 border border-amber-900/45 text-amber-500 font-bold px-1.5 rounded-sm">
+                            VÀO LỆNH THIẾU KỶ LUẬT
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteClosedTrade(t.id)}
+                          className="text-slate-600 hover:text-rose-450 p-0.5 ml-2 transition"
+                          title="Xóa dòng lịch sử"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* DISCIPLINE HISTORY & INTUITIVE STATS SECTION */}
+      <div id="discipline-history-daily-limit-section" className="space-y-4 pt-4 mt-8">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-805">
+          <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
+            <Scale className="w-4 h-4 text-violet-400" />
+            Lịch Sử Kỷ Luật & Chỉ Số Tuân Thủ Daily Limit ({dailyDisciplineLogs.length})
+          </h3>
+          {onClearDisciplineLogs && dailyDisciplineLogs.length > 0 && (
+            <button
+              onClick={() => {
+                setShowResetLogsModal(true);
+                setResetPhraseInput('');
+              }}
+              className="px-3 py-1.5 bg-rose-950/45 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 rounded-xl text-[11px] font-black cursor-pointer transition duration-150 flex items-center gap-1.5 shadow-md shadow-rose-950/20 uppercase tracking-wider"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Reset Lịch Sử Kỷ Luật
+            </button>
+          )}
+        </div>
+
+        {dailyDisciplineLogs.length === 0 ? (
+          <div className="text-center py-10 border border-dashed border-slate-800 rounded-2xl bg-[#14171F]/10">
+            <Calendar className="w-6 h-6 text-slate-700 mx-auto mb-2" />
+            <p className="text-[11px] text-slate-400">Chưa ghi nhận ngày giao dịch nào có thiết lập Daily Limit.</p>
+            <p className="text-[10px] text-slate-600 mt-1">Cài đặt Daily Limit (%) ở Tab tính toán & vào vị thế để bắt đầu lưu trữ kỷ luật.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Discipline KPI Cards */}
+            {(() => {
+              const totalDays = dailyDisciplineLogs.length;
+              const breachedDays = dailyDisciplineLogs.filter(l => l.isExceeded).length;
+              const disciplinedDays = totalDays - breachedDays;
+              const score = totalDays > 0 ? Math.round((disciplinedDays / totalDays) * 100) : 100;
+
+              let feedbackText = "Thật tuyệt vời! Bạn đang kiểm soát rủi ro cực tốt.";
+              let feedbackColor = "text-emerald-400";
+              let ratingText = "KỶ LUẬT THÉP";
+              let progressColor = "bg-emerald-500";
+              
+              if (score < 50) {
+                feedbackText = "Báo động nghiêm trọng! Bạn cần phải dừng việc liên tục overtrade và phá luật ngày.";
+                feedbackColor = "text-rose-400";
+                ratingText = "VÔ KỶ LUẬT";
+                progressColor = "bg-rose-500";
+              } else if (score < 80) {
+                feedbackText = "Tương đối ổn, tuy nhiên vẫn còn một số ngày buông lỏng kỷ luật rủi ro.";
+                feedbackColor = "text-yellow-400";
+                ratingText = "TRUNG BÌNH";
+                progressColor = "bg-yellow-500";
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Total Traded Days */}
+                  <div className="bg-[#14171F] border border-slate-800/60 p-4 rounded-2xl flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Giao dịch</span>
+                      <span className="text-base font-mono font-black text-slate-100">{totalDays} Ngày</span>
+                    </div>
+                  </div>
+
+                  {/* Safe Disciplined Days */}
+                  <div className="bg-[#14171F] border border-slate-800/60 p-4 rounded-2xl flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-900/30 text-emerald-400">
+                      <CheckCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider block">An Toàn</span>
+                      <span className="text-base font-mono font-black text-emerald-450">{disciplinedDays} Ngày</span>
+                    </div>
+                  </div>
+
+                  {/* Breached Danger Days */}
+                  <div className="bg-[#14171F] border border-slate-800/60 p-4 rounded-2xl flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-rose-955 border border-rose-900 text-rose-400">
+                      <AlertCircle className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-rose-500/80 font-bold uppercase tracking-wider block">Vượt Giới Hạn</span>
+                      <span className="text-base font-mono font-black text-rose-550">{breachedDays} Ngày</span>
+                    </div>
+                  </div>
+
+                  {/* Discipline Score Indicator */}
+                  <div className="bg-[#14171F] border border-slate-800/50 p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Chỉ Số Tuân Thủ</span>
+                      <span className={`text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded border ${feedbackColor} border-current bg-[#1C212D]/55`}>
+                        {ratingText}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-xl font-mono font-black text-white">{score}%</span>
+                      <span className="text-[10px] text-slate-500">tổng điểm</span>
+                    </div>
+                    {/* Tiny visual progress bar */}
+                    <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-2 border border-slate-805">
+                      <div className={`h-full ${progressColor}`} style={{ width: `${score}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Daily limit historical table */}
+            <div className="bg-[#14171F] border border-slate-800/65 rounded-2xl overflow-hidden">
+              <div className="divide-y divide-slate-805">
+                {dailyDisciplineLogs.map((log) => {
+                  const dObj = new Date(log.date);
+                  const formattedDate = isNaN(dObj.getTime())
+                    ? log.date
+                    : dObj.toLocaleDateString('vi-VN', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      });
+
+                  return (
+                    <div
+                      key={log.date}
+                      className={`p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-[#1C212D]/10 transition-all ${
+                        log.isExceeded 
+                          ? 'border-l-4 border-l-red-500/70 bg-red-950/5' 
+                          : 'border-l-4 border-l-emerald-500/50 bg-emerald-955/[0.01]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-xl border shrink-0 ${
+                          log.isExceeded 
+                            ? 'bg-red-955/20 border-red-950/30 text-red-400' 
+                            : 'bg-emerald-955/20 border-emerald-900/30 text-emerald-450'
+                        }`}>
+                          {log.isExceeded ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-200">{formattedDate}</span>
+                            <span className="text-[9px] text-slate-400 font-mono">({log.date})</span>
+                            {log.breachedByForce && (
+                              <span className="text-[8px] bg-red-900/35 border border-red-800/40 text-red-300 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                Đã Ép Vào Lệnh
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            <span>Giới hạn cho phép: <strong className="text-slate-400 font-mono">${log.allowedLimit.toLocaleString('en-US', { maximumFractionDigits: 1 })}</strong></span>
+                            <span className="text-slate-700 font-bold">•</span>
+                            <span>Sức chịu rủi ro đã dùng: <strong className={log.isExceeded ? 'text-red-400 font-mono font-bold' : 'text-emerald-400 font-mono font-bold'}>${log.totalRisk.toLocaleString('en-US', { maximumFractionDigits: 1 })}</strong></span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center sm:text-right flex-row sm:flex-col gap-2 justify-between sm:justify-start">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono ${
+                          log.isExceeded 
+                            ? 'bg-red-950/20 border-red-905/40 text-red-400' 
+                            : 'bg-emerald-950/20 border-emerald-905/40 text-emerald-450'
+                        }`}>
+                          {log.isExceeded ? 'VƯỢT GIỚI HẠN (VI PHẠM)' : 'KỶ LUẬT AN TOÀN'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* RESET CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {showResetLogsModal && (
+          <div className="fixed inset-0 bg-[#06080C]/90 backdrop-blur-md flex items-center justify-center p-4 z-110">
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              className="bg-[#14171F] border border-red-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden text-center"
+            >
+              <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+              <div className="mx-auto w-12 h-12 rounded-xl bg-red-955 border border-red-900/30 text-rose-400 flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 animate-pulse" />
+              </div>
+
+              <h3 className="text-red-400 font-extrabold text-sm uppercase tracking-widest font-sans flex items-center justify-center gap-1.5 animate-pulse">
+                Xác nhận khôi phục
+              </h3>
+              
+              <p className="text-sm text-slate-100 font-extrabold font-sans mt-3">
+                Bạn có thật sự muốn bỏ Daily Limit không?
+              </p>
+
+              <div className="mt-4 p-3 bg-[#1C212D]/85 border border-red-900/30 rounded-xl text-left text-xs leading-relaxed text-slate-400">
+                Toàn bộ dữ liệu lịch sử tuân thủ, điểm số kỷ luật, và hành trình rèn luyện rủi ro ngày của bạn sẽ bị xoá sạch vĩnh viễn và không thể khôi phục lại.
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
+                  Để xác minh việc này, bạn bắt buộc phải gõ chính xác dòng chữ dưới đây:
+                </p>
+                <div className="bg-[#1C212D] px-3 py-2 text-[11px] font-mono text-[#F43F5E] select-none font-black tracking-wide border border-red-950/50 rounded-lg">
+                  Tôi chấp nhận làm lại từ đầu
+                </div>
+                <input
+                  type="text"
+                  placeholder="Gõ chính xác dòng chữ trên tại đây..."
+                  value={resetPhraseInput}
+                  onChange={(e) => setResetPhraseInput(e.target.value)}
+                  className="w-full bg-[#1C212D]/95 border border-slate-750 text-slate-205 placeholder-slate-600 focus:border-red-500 focus:outline-hidden font-sans text-xs text-center py-2.5 px-3 rounded-xl transition duration-150"
+                  autoFocus
+                />
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowResetLogsModal(false)}
+                  className="py-2.5 px-4 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-black rounded-xl cursor-pointer transition duration-150 uppercase tracking-wider"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={resetPhraseInput !== "Tôi chấp nhận làm lại từ đầu"}
+                  onClick={() => {
+                    if (onClearDisciplineLogs) {
+                      onClearDisciplineLogs();
+                    }
+                    setShowResetLogsModal(false);
+                    setResetPhraseInput('');
+                  }}
+                  className={`py-2.5 px-4 border text-xs font-black rounded-xl transition duration-150 uppercase tracking-wider select-none ${
+                    resetPhraseInput === "Tôi chấp nhận làm lại từ đầu"
+                      ? "bg-red-950/30 hover:bg-red-900/60 border-red-800 text-red-350 cursor-pointer shadow-lg shadow-red-950/20"
+                      : "bg-[#14171F] border-slate-800 text-slate-600 cursor-not-allowed"
+                  }`}
+                >
+                  Xoá lịch sử
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}
