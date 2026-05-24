@@ -1,5 +1,5 @@
 {
-  "name": "Position Size Calculator",
+  "name": "Risk Wise App",
   "description": "Công cụ tính toán khối lượng vị thế chuyên sâu kết hợp Nhật ký Kế hoạch giao dịch, Checklist quản trị kỷ luật và Danh mục quản lý PnL mở rộng dành cho nhà giao dịch chuyên nghiệp.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
