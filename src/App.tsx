@@ -1,9 +1,7 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AssetClass, TradeSetup, CalculationResult, ChecklistItem, PortfolioTrade, TradingPlan, DailyLimitLog } from './types';
 import { calculatePositionSize, FOREX_PAIRS } from './utils/calculator';
 import ForexCalculator from './components/ForexCalculator';
-
-const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 import CryptoStockCalculator from './components/CryptoStockCalculator';
 import RiskMeter from './components/RiskMeter';
 import TradeVisualizer from './components/TradeVisualizer';
@@ -11,8 +9,6 @@ import SavedSetups from './components/SavedSetups';
 import PreTradeChecklist from './components/PreTradeChecklist';
 import TradingPlanManager from './components/TradingPlanManager';
 import PortfolioTracker from './components/PortfolioTracker';
-import { supabase } from './supabaseClient';
-import SupabaseAuth from './components/SupabaseAuth';
 import { 
   Calculator, 
   Wallet, 
@@ -28,15 +24,25 @@ import {
   ChevronRight,
   Info,
   CheckCircle2,
-  LogOut,
   Database,
   Code,
   Terminal,
   Copy,
-  Check
+  Check,
+  Download,
+  Upload,
+  ExternalLink,
+  ChevronDown
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
+
+// Affiliate Links configurations for customization
+const AFFILIATE_LINKS = { 
+  binance: 'https://accounts.binance.com/register?ref=YOUR_ID', 
+  bybit: 'https://www.bybit.com/register?affiliate_id=YOUR_ID', 
+  okx: 'https://www.okx.com/join/YOUR_ID' 
+};
 
 // Default initial state
 const defaultSetup: TradeSetup = {
@@ -95,9 +101,9 @@ export default function App() {
     return [];
   });
 
-  const [activeTab, setActiveTab] = useState<'calculator' | 'portfolio' | 'plans' | 'admin'>(() => {
+  const [activeTab, setActiveTab] = useState<'calculator' | 'portfolio' | 'plans'>(() => {
     const rawTab = localStorage.getItem('active_tab');
-    if (rawTab === 'calculator' || rawTab === 'portfolio' || rawTab === 'plans' || rawTab === 'admin') {
+    if (rawTab === 'calculator' || rawTab === 'portfolio' || rawTab === 'plans') {
       return rawTab;
     }
     return 'calculator';
@@ -126,21 +132,58 @@ export default function App() {
     ];
   });
 
-  // Supabase Auth and State Management
-  const [session, setSession] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showSqlSetup, setShowSqlSetup] = useState(false);
-  const [userTier, setUserTier] = useState<'free' | 'premium'>('free');
+  const [showAffiliateDropdown, setShowAffiliateDropdown] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowAffiliateDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Offline defaults - Unlimited access
+  const isUserAdmin = false;
+  const isPremium = true;
   const [showPaywall, setShowPaywall] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Portfolio active positions
-  const [activeTrades, setActiveTrades] = useState<PortfolioTrade[]>([]);
+  // Portfolio active positions from localStorage
+  const [activeTrades, setActiveTrades] = useState<PortfolioTrade[]>(() => {
+    try {
+      const persisted = localStorage.getItem('trading_active_trades');
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(item => item && typeof item === 'object');
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
 
-  // Closed history trades log
-  const [closedTrades, setClosedTrades] = useState<PortfolioTrade[]>([]);
+  // Closed history trades log from localStorage
+  const [closedTrades, setClosedTrades] = useState<PortfolioTrade[]>(() => {
+    try {
+      const persisted = localStorage.getItem('trading_closed_trades');
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(item => item && typeof item === 'object');
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
 
   // Trading plans state
   const [plans, setPlans] = useState<TradingPlan[]>(() => {
@@ -184,27 +227,88 @@ export default function App() {
     allowedLimitUSD: 0
   });
 
-  const isUserAdmin = isAdmin || session?.user?.email === 'huyxoanls22@gmail.com';
-  const isPremium = userTier === 'premium' || isUserAdmin;
+  // Export JSON Backup
+  const handleBackup = () => {
+    try {
+      const backupData = {
+        current_tradesetup: JSON.parse(localStorage.getItem('current_tradesetup') || 'null'),
+        trading_saved_setups: JSON.parse(localStorage.getItem('trading_saved_setups') || '[]'),
+        trading_checklist_items: JSON.parse(localStorage.getItem('trading_checklist_items') || '[]'),
+        trading_plans: JSON.parse(localStorage.getItem('trading_plans') || '[]'),
+        trading_active_trades: JSON.parse(localStorage.getItem('trading_active_trades') || '[]'),
+        trading_closed_trades: JSON.parse(localStorage.getItem('trading_closed_trades') || '[]'),
+        trading_daily_discipline_logs: JSON.parse(localStorage.getItem('trading_daily_discipline_logs') || '[]')
+      };
 
-  // Supabase Auth State Engine Sync
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (!session) {
-        setIsLoading(false);
+      const dataStr = JSON.stringify(backupData, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      const exportFileDefaultName = `riskwise_backup_${new Date().toISOString().split('T')[0]}.json`;
+
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+    } catch (e) {
+      alert("Lỗi khi xuất dữ liệu backup!");
+      console.error(e);
+    }
+  };
+
+  // Import / Restore JSON Backup
+  const handleRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    fileReader.onload = (e) => {
+      try {
+        const resultText = e.target?.result;
+        if (typeof resultText !== 'string') return;
+        
+        const parsedData = JSON.parse(resultText);
+        
+        if (parsedData && typeof parsedData === 'object') {
+          if (parsedData.current_tradesetup) {
+            localStorage.setItem('current_tradesetup', JSON.stringify(parsedData.current_tradesetup));
+            setSetup(parsedData.current_tradesetup);
+          }
+          if (Array.isArray(parsedData.trading_saved_setups)) {
+            localStorage.setItem('trading_saved_setups', JSON.stringify(parsedData.trading_saved_setups));
+            setSavedList(parsedData.trading_saved_setups);
+          }
+          if (Array.isArray(parsedData.trading_checklist_items)) {
+            localStorage.setItem('trading_checklist_items', JSON.stringify(parsedData.trading_checklist_items));
+            setChecklist(parsedData.trading_checklist_items);
+          }
+          if (Array.isArray(parsedData.trading_plans)) {
+            localStorage.setItem('trading_plans', JSON.stringify(parsedData.trading_plans));
+            setPlans(parsedData.trading_plans);
+          }
+          if (Array.isArray(parsedData.trading_active_trades)) {
+            localStorage.setItem('trading_active_trades', JSON.stringify(parsedData.trading_active_trades));
+            setActiveTrades(parsedData.trading_active_trades);
+          }
+          if (Array.isArray(parsedData.trading_closed_trades)) {
+            localStorage.setItem('trading_closed_trades', JSON.stringify(parsedData.trading_closed_trades));
+            setClosedTrades(parsedData.trading_closed_trades);
+          }
+          if (Array.isArray(parsedData.trading_daily_discipline_logs)) {
+            localStorage.setItem('trading_daily_discipline_logs', JSON.stringify(parsedData.trading_daily_discipline_logs));
+            setDailyDisciplineLogs(parsedData.trading_daily_discipline_logs);
+          }
+
+          alert("Khôi phục dữ liệu thành công! Ứng dụng sẽ tự động tải lại để cập nhật.");
+          window.location.reload();
+        } else {
+          alert("File JSON khôi phục không đúng định dạng backup.");
+        }
+      } catch (error) {
+        alert("Lỗi khi khôi phục dữ liệu, vui lòng kiểm tra lại file của bạn.");
+        console.error(error);
       }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) {
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    };
+    fileReader.readAsText(files[0]);
+  };
 
   // Copy to clipboard helper
   const handleCopy = (text: string, fieldId: string) => {
@@ -215,206 +319,15 @@ export default function App() {
     }, 2000);
   };
 
-  // Fetch Trades from Supabase when session changes
-  const fetchTradesFromSupabase = async () => {
-    if (!session?.user?.id) return;
-    try {
-      const { data, error } = await supabase
-        .from('trades')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('entered_at', { ascending: false });
-      
-      if (error) throw error;
-      if (data) {
-        const mapped: PortfolioTrade[] = data.map((t: any) => ({
-          id: t.id,
-          ticker: t.ticker,
-          assetClass: t.asset_class as AssetClass,
-          direction: t.direction as 'long' | 'short',
-          entryPrice: Number(t.entry_price),
-          currentPrice: Number(t.current_price),
-          units: Number(t.units),
-          lots: t.lots ? Number(t.lots) : undefined,
-          riskAmount: Number(t.risk_amount),
-          stopLoss: t.stop_loss,
-          takeProfit: t.take_profit,
-          pnl: Number(t.pnl),
-          trailingStopPrice: t.trailing_stop_price ? Number(t.trailing_stop_price) : undefined,
-          status: t.status as 'active' | 'won' | 'lost',
-          enteredAt: t.entered_at,
-          uncheckedWarning: !!t.unchecked_warning,
-          sector: t.sector,
-          notes: t.notes || ''
-        }));
-
-        const active = mapped.filter((t) => t.status === 'active');
-        const closed = mapped.filter((t) => t.status !== 'active');
-        
-        setActiveTrades(active);
-        setClosedTrades(closed);
-      }
-    } catch (e) {
-      console.error('Lỗi khi tải dữ liệu từ Supabase:', e);
-    }
-  };
-
-  const fetchProfileTier = async (userId: string, email?: string) => {
-    try {
-      setIsLoading(true);
-
-      const isHardcodedAdmin = email === 'huyxoanls22@gmail.com' || session?.user?.email === 'huyxoanls22@gmail.com';
-      if (isHardcodedAdmin) {
-        setUserTier('premium');
-        setIsAdmin(true);
-        setIsLoading(false);
-        return;
-      }
-
-      // 1. Tìm profile trong bảng profiles của Supabase
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Lỗi khi truy vấn profiles từ Supabase:", error);
-        setUserTier('free');
-        setIsAdmin(false);
-        setIsLoading(false);
-        return;
-      }
-
-      if (!data) {
-        // 2. Nếu chưa có profile (user mới đăng ký), tự động đồng bộ (upsert) thông tin vào bảng profiles với tier = 'free'
-        // Sử dụng ignoreDuplicates: true (ON CONFLICT DO NOTHING) để không ghi đè nếu dòng đã tồn tại hoặc được tạo từ Trigger backend
-        const { error: upsertError } = await supabase
-          .from('profiles')
-          .upsert({
-            user_id: userId,
-            email: email || null,
-            tier: 'free',
-            subscription_type: null,
-            expires_at: null,
-            is_admin: false
-          }, { onConflict: 'user_id', ignoreDuplicates: true });
-
-        if (upsertError) {
-          console.error("Lỗi khi tự động tạo profile mới cho học viên:", upsertError);
-        }
-        setUserTier('free');
-        setIsAdmin(false);
-      } else {
-        // 3. Nếu đã có profile, kiểm tra xem có bị hết hạn Premium chưa
-        let activeTier = data.tier || 'free';
-        let activeAdmin = data.is_admin || false;
-        
-        if (activeTier === 'premium' && data.expires_at) {
-          const expiresDate = new Date(data.expires_at);
-          if (expiresDate.getTime() < Date.now()) {
-            // Gói Premium hết hạn -> Cập nhật xuống gói Free ngay lập tức
-            await supabase
-              .from('profiles')
-              .update({
-                tier: 'free',
-                subscription_type: null,
-                expires_at: null
-              })
-              .eq('user_id', userId);
-            
-            activeTier = 'free';
-          }
-        }
-        
-        setUserTier(activeTier as 'free' | 'premium');
-        setIsAdmin(activeAdmin);
-      }
-    } catch (e) {
-      console.error('Lỗi khi xử lý phân quyền người dùng:', e);
-      setUserTier('free');
-      setIsAdmin(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Synchronizers
+  useEffect(() => {
+    localStorage.setItem('trading_active_trades', JSON.stringify(activeTrades));
+  }, [activeTrades]);
 
   useEffect(() => {
-    let channel: any = null;
+    localStorage.setItem('trading_closed_trades', JSON.stringify(closedTrades));
+  }, [closedTrades]);
 
-    if (session) {
-      setIsLoading(true);
-      fetchTradesFromSupabase();
-      fetchProfileTier(session.user.id, session.user.email);
-
-      // Đăng ký nhận thông báo thay đổi thời gian thực từ Supabase cho hồ sơ của riêng user này
-      channel = supabase
-        .channel(`public:profiles:user_id=eq.${session.user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'profiles',
-            filter: `user_id=eq.${session.user.id}`
-          },
-          (payload) => {
-            console.log('Phát hiện cập nhật từ Supabase Realtime:', payload);
-            const updated = payload.new as any;
-            // CHỈ xử lý nếu dòng cập nhật thực sự thuộc về user đang đăng nhập hiện tại
-            if (updated && updated.user_id === session?.user?.id) {
-              const checkAdmin = session?.user?.email === 'huyxoanls22@gmail.com' || updated.is_admin === true;
-              if (checkAdmin) {
-                setUserTier('premium');
-                setIsAdmin(true);
-                return;
-              }
-
-              let activeTier = updated.tier || 'free';
-              if (activeTier === 'premium' && updated.expires_at) {
-                const expiresDate = new Date(updated.expires_at);
-                if (expiresDate.getTime() < Date.now()) {
-                  activeTier = 'free';
-                  // Đồng bộ ngược lại Database khi phát hiện quá hạn qua Realtime
-                  supabase
-                    .from('profiles')
-                    .update({
-                      tier: 'free',
-                      subscription_type: null,
-                      expires_at: null
-                    })
-                    .eq('user_id', session.user.id)
-                    .then(({ error }) => {
-                      if (error) console.error("Lỗi cập nhật hết hạn từ Realtime:", error);
-                    });
-                }
-              }
-              setUserTier(activeTier as 'free' | 'premium');
-              setIsAdmin(updated.is_admin || false);
-            }
-          }
-        )
-        .subscribe();
-    } else {
-      setActiveTrades([]);
-      setClosedTrades([]);
-      setUserTier('free');
-      setIsAdmin(false);
-      setIsLoading(false);
-    }
-
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, [session]);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  // Synchronizers
   useEffect(() => {
     localStorage.setItem('trading_daily_discipline_logs', JSON.stringify(dailyDisciplineLogs));
   }, [dailyDisciplineLogs]);
@@ -453,9 +366,12 @@ export default function App() {
           .filter(t => t.enteredAt.startsWith(logDate) || t.enteredAt.split('T')[0] === logDate)
           .reduce((sum, t) => sum + t.riskAmount, 0);
 
+        // FIX #3a: Dùng riskAmount (vốn bỏ ra rủi ro), không dùng -pnl
+        // Lý do: lệnh thắng có pnl > 0 → -pnl âm → tổng risk ngày bị giảm xuống số âm (vô nghĩa)
+        // "Rủi ro đã dùng" là số tiền bạn SẴN SÀNG mất, không phải lợi nhuận thực tế
         const closedRiskForDay = closedTrades
           .filter(t => t.enteredAt.startsWith(logDate) || t.enteredAt.split('T')[0] === logDate)
-          .reduce((sum, t) => sum - t.pnl, 0);
+          .reduce((sum, t) => sum + t.riskAmount, 0);
 
         const computedRisk = Math.round((activeRiskForDay + closedRiskForDay) * 100) / 100;
         const isExceeded = log.allowedLimit > 0 && computedRisk > log.allowedLimit;
@@ -586,10 +502,10 @@ export default function App() {
       .filter(t => t.enteredAt.startsWith(todayDateStr) || t.enteredAt.split('T')[0] === todayDateStr)
       .reduce((sum, t) => sum + t.riskAmount, 0);
 
-    // Sum up actual risk used for closed trades as negative PnL (realized loss/gain)
+    // FIX #3c: Dùng riskAmount — đây là "vốn rủi ro đã dùng hôm nay", không phải lợi/lỗ thực tế
     const closedTodayRisk = closedTrades
       .filter(t => t.enteredAt.startsWith(todayDateStr) || t.enteredAt.split('T')[0] === todayDateStr)
-      .reduce((sum, t) => sum - t.pnl, 0);
+      .reduce((sum, t) => sum + t.riskAmount, 0);
 
     const todayRiskTotal = activeTodayRisk + closedTodayRisk;
     const currentNewRisk = result.riskAmount;
@@ -664,16 +580,14 @@ export default function App() {
       entryPr = setup.entryPrice || 100;
       stopLossStr = `$${(setup.stopLossPrice || 0).toLocaleString()}`;
       trSector = setup.sector ? setup.sector.trim() : 'Chưa phân loại';
-      
-      // deduce direction
-      direction = entryPr > (setup.stopLossPrice || 0) ? 'long' : 'short';
+      // FIX #1: Dùng direction user đã chọn, không tự suy luận từ giá
+      // Suy luận từ giá gây lật direction khi user vào Short nhưng SL chưa đúng vị trí
+      direction = setup.direction || 'long';
     }
 
     const tDate = new Date();
     const isoString = tDate.toISOString();
     const todayDateStr = getLocalTodayDateStr();
-
-    const userSessionId = session?.user?.id;
     const randId = generateUniqueId();
 
     const newTrade: PortfolioTrade = {
@@ -700,46 +614,16 @@ export default function App() {
     // Optimistically update local UI state
     setActiveTrades(prev => [newTrade, ...prev]);
 
-    // Save directly to Supabase Database
-    if (session) {
-      supabase.from('trades').insert([{
-        id: randId,
-        user_id: userSessionId,
-        ticker,
-        asset_class: setup.assetClass,
-        direction,
-        entry_price: entryPr,
-        current_price: entryPr,
-        units,
-        lots: setup.assetClass === 'forex' ? result.positionSizeLots : null,
-        risk_amount: result.riskAmount,
-        stop_loss: stopLossStr,
-        take_profit: newTrade.takeProfit,
-        pnl: 0,
-        status: 'active',
-        entered_at: isoString,
-        unchecked_warning: bypassForce,
-        sector: trSector
-      }]).then(({ error }) => {
-        if (error) {
-          console.error('Lỗi khi lưu vị thế lên Supabase:', error);
-        }
-      });
-    }
-
     // Keep Daily Disciplinary Log in sync
     setDailyDisciplineLogs(prev => {
       const existingIdx = prev.findIndex(l => l.date === todayDateStr);
       
-      const activeRiskTodayNow = activeTrades
-        .filter(t => t.enteredAt.startsWith(todayDateStr) || t.enteredAt.split('T')[0] === todayDateStr)
-        .reduce((sum, t) => sum + t.riskAmount, 0);
-
-      const closedRiskTodayNow = closedTrades
-        .filter(t => t.enteredAt.startsWith(todayDateStr) || t.enteredAt.split('T')[0] === todayDateStr)
-        .reduce((sum, t) => sum - t.pnl, 0);
-
-      const todayRiskNow = activeRiskTodayNow + closedRiskTodayNow + result.riskAmount;
+      // FIX #5: Không đọc activeTrades/closedTrades từ closure (stale state).
+      // Thay vào đó: truyền newTrade vào hàm và tính trực tiếp từ snapshot hiện tại
+      // bằng cách dùng functional updater. Vì setActiveTrades là async, activeTrades
+      // ở đây vẫn là giá trị CŨ → tính thủ công từ current daily log + newTrade.riskAmount
+      const existingLogRisk = prev.find(l => l.date === todayDateStr)?.totalRisk || 0;
+      const todayRiskNow = Math.round((existingLogRisk + result.riskAmount) * 100) / 100;
 
       const maxDailyLimitUSD = (setup.dailyLimitPercent && setup.dailyLimitPercent > 0)
         ? setup.accountBalance * (setup.dailyLimitPercent / 100)
@@ -769,18 +653,45 @@ export default function App() {
     setActiveTab('portfolio');
   };
 
-  const handleCloseTrade = async (id: string, outcome: 'won' | 'lost', finalPrice?: number) => {
+  const handleCloseTrade = (id: string, outcome: 'won' | 'lost', finalPrice?: number) => {
     const trade = activeTrades.find(t => t.id === id);
     if (!trade) return;
 
-    let correctedPnl = trade.pnl;
-    if (outcome === 'won') {
-      correctedPnl = Math.abs(trade.pnl || trade.riskAmount);
+    // FIX #2: Tính PnL đúng khi đóng lệnh
+    // Ưu tiên: (1) finalPrice nếu có, (2) trade.pnl nếu đã cập nhật giá (≠ 0),
+    // (3) tính từ takeProfit nếu có, (4) KHÔNG dùng riskAmount làm fallback PnL
+    let correctedPnl: number;
+
+    if (trade.pnl !== 0) {
+      // User đã cập nhật giá hiện tại → dùng floating PnL thực tế
+      correctedPnl = outcome === 'won'
+        ? Math.abs(trade.pnl)
+        : -Math.abs(trade.pnl);
+    } else if (trade.assetClass === 'crypto_stock' && trade.takeProfit && trade.takeProfit !== 'Chưa cài') {
+      // Tính từ takeProfit price nếu có (crypto/stock)
+      const tpPrice = parseFloat(String(trade.takeProfit).replace(/[^0-9.]/g, ''));
+      if (!isNaN(tpPrice) && tpPrice > 0) {
+        const isLong = trade.direction === 'long';
+        const tpPnl = isLong
+          ? (tpPrice - trade.entryPrice) * trade.units
+          : (trade.entryPrice - tpPrice) * trade.units;
+        correctedPnl = outcome === 'won' ? Math.abs(tpPnl) : -Math.abs(trade.riskAmount);
+      } else {
+        // Không đủ thông tin → dùng riskAmount có cảnh báo
+        correctedPnl = outcome === 'won' ? trade.riskAmount : -trade.riskAmount;
+      }
     } else {
-      correctedPnl = -Math.abs(trade.pnl || trade.riskAmount);
+      // Fallback cuối: riskAmount — nhưng user nên được nhắc cập nhật giá trước
+      correctedPnl = outcome === 'won' ? trade.riskAmount : -trade.riskAmount;
     }
 
     const finalPnl = Math.round(correctedPnl * 100) / 100;
+
+    // BONUS: Nhắc user nếu PnL chưa được cập nhật (trade.pnl === 0 nghĩa là chưa update giá)
+    if (trade.pnl === 0 && outcome === 'won') {
+      // Không block, chỉ log để biết PnL có thể không chính xác
+      console.warn(`[handleCloseTrade] Trade ${trade.ticker}: PnL = 0 khi đóng lệnh thắng. Cân nhắc cập nhật giá hiện tại trước khi đóng để thống kê chính xác hơn.`);
+    }
 
     const closed: PortfolioTrade = {
       ...trade,
@@ -795,59 +706,20 @@ export default function App() {
       return [closed, ...history];
     });
     setActiveTrades(prev => prev.filter(t => t.id !== id));
-
-    // Update in Supabase
-    if (session) {
-      const { error } = await supabase
-        .from('trades')
-        .update({
-          status: outcome,
-          pnl: finalPnl
-        })
-        .eq('id', id);
-      
-      if (error) {
-        console.error('Lỗi khi cập nhật vị thế đóng lên Supabase:', error);
-      }
-    }
   };
 
-  const handleDeleteClosedTrade = async (id: string) => {
+  const handleDeleteClosedTrade = (id: string) => {
     // Optimistic local update
     setClosedTrades(prev => prev.filter(t => t.id !== id));
-
-    if (session?.user?.id) {
-      const { error } = await supabase
-        .from('trades')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', session.user.id);
-      
-      if (error) {
-        console.error('Lỗi khi xoá vị thế khỏi Supabase:', error);
-      }
-    }
   };
 
-  const handleClearClosedHistory = async () => {
+  const handleClearClosedHistory = () => {
     if (window.confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử vị thế đã đóng?")) {
       setClosedTrades([]);
-
-      if (session?.user?.id) {
-        const { error } = await supabase
-          .from('trades')
-          .delete()
-          .not('status', 'eq', 'active')
-          .eq('user_id', session.user.id);
-        
-        if (error) {
-          console.error('Lỗi khi xoá lịch sử vị thế đã đóng trên Supabase:', error);
-        }
-      }
     }
   };
 
-  const handleUpdateCurrentPrice = async (id: string, newPrice: number) => {
+  const handleUpdateCurrentPrice = (id: string, newPrice: number) => {
     let finalPnl = 0;
     
     setActiveTrades(prev => prev.map(trade => {
@@ -859,12 +731,38 @@ export default function App() {
       if (trade.assetClass === 'forex') {
         const pairConfig = FOREX_PAIRS.find(p => p.symbol === trade.ticker);
         const pipSize = pairConfig?.pipSize || 0.0001;
-        const pipValLot = trade.lots !== undefined ? (FOREX_PAIRS.find(p => p.symbol === trade.ticker)?.defaultPipValueUSD || 10) : 10;
-        
+
+        // FIX #4: Tính pip value động theo tỷ giá hiện tại thay vì hardcode $10
+        // Công thức chuẩn: pip value (USD) = (pipSize / tỷ giá quote/USD) * units
+        // Với USD quote pairs (EUR/USD, GBP/USD...): pipValue = pipSize * units
+        // Với JPY pairs (USD/JPY, EUR/JPY...): pipValue = (pipSize / currentPrice) * units
+        // Với USD base pairs (USD/JPY, USD/CAD...): cần chia thêm cho tỷ giá
+        const isJpyQuote = trade.ticker.endsWith('/JPY') || trade.ticker.endsWith('JPY');
+        const isUsdQuote = trade.ticker.endsWith('/USD') || trade.ticker === 'EUR/USD'
+          || trade.ticker === 'GBP/USD' || trade.ticker === 'AUD/USD' || trade.ticker === 'NZD/USD';
+        const isUsdBase = trade.ticker.startsWith('USD/');
+
+        let pipValuePerLot: number;
+        if (isUsdQuote) {
+          // EUR/USD, GBP/USD, AUD/USD, NZD/USD: pip value = $10/lot (cố định)
+          pipValuePerLot = pairConfig?.defaultPipValueUSD || 10;
+        } else if (isJpyQuote) {
+          // USD/JPY, EUR/JPY, GBP/JPY: pip value thay đổi theo tỷ giá
+          // Công thức: (pipSize * standardLot) / currentPrice
+          const standardLot = pairConfig?.standardLotUnits || 100000;
+          pipValuePerLot = (pipSize * standardLot) / newPrice;
+        } else if (isUsdBase) {
+          // USD/CAD, USD/CHF: pip value = (pipSize * standardLot) / currentPrice
+          const standardLot = pairConfig?.standardLotUnits || 100000;
+          pipValuePerLot = (pipSize * standardLot) / newPrice;
+        } else {
+          // Fallback: dùng defaultPipValueUSD từ config
+          pipValuePerLot = pairConfig?.defaultPipValueUSD || 10;
+        }
+
         const pipsDiff = (newPrice - trade.entryPrice) / pipSize;
         const multiplier = isLong ? 1 : -1;
-        
-        calculatedPnl = pipsDiff * (trade.lots || 0) * pipValLot * multiplier;
+        calculatedPnl = pipsDiff * (trade.lots || 0) * pipValuePerLot * multiplier;
       } else {
         const priceDiff = isLong ? (newPrice - trade.entryPrice) : (trade.entryPrice - newPrice);
         calculatedPnl = priceDiff * trade.units;
@@ -878,24 +776,9 @@ export default function App() {
         pnl: finalPnl
       };
     }));
-
-    // Save directly inside Supabase
-    if (session) {
-      const { error } = await supabase
-        .from('trades')
-        .update({
-          current_price: newPrice,
-          pnl: finalPnl
-        })
-        .eq('id', id);
-
-      if (error) {
-        console.error('Lỗi khi cập nhật giá hiện tại lên Supabase:', error);
-      }
-    }
   };
 
-  const handleUpdateTrailingStop = async (id: string, trailingPrice: number | undefined) => {
+  const handleUpdateTrailingStop = (id: string, trailingPrice: number | undefined) => {
     setActiveTrades(prev => prev.map(trade => {
       if (trade.id !== id) return trade;
       return {
@@ -903,19 +786,6 @@ export default function App() {
         trailingStopPrice: trailingPrice
       };
     }));
-
-    if (session) {
-      const { error } = await supabase
-        .from('trades')
-        .update({
-          trailing_stop_price: trailingPrice || null
-        })
-        .eq('id', id);
-
-      if (error) {
-        console.error('Lỗi khi cập nhật Trailing Stop lên Supabase:', error);
-      }
-    }
   };
 
 
@@ -954,130 +824,6 @@ export default function App() {
     setActiveTab('calculator');
   };
 
-  const [copiedSql, setCopiedSql] = useState(false);
-  const sqlScript = `-- 1. Tạo bảng profiles lưu thông tin gói cước người dùng (Bổ sung email, hạn dùng, is_admin)
-CREATE TABLE IF NOT EXISTS profiles (
-  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT,
-  tier TEXT NOT NULL DEFAULT 'free' CHECK (tier IN ('free', 'premium')),
-  subscription_type TEXT,
-  expires_at TIMESTAMPTZ,
-  is_admin BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
-);
-
--- Thêm cột is_admin nếu nâng cấp từ schema cũ
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
-
--- Kích hoạt mã bảo mật RLS cho profiles
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
--- Tạo hàm kiểm tra admin chạy dưới quyền SECURITY DEFINER để tránh lỗi recursion (vòng lặp vô hạn)
-CREATE OR REPLACE FUNCTION public.check_is_admin(p_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_is_admin BOOLEAN;
-  v_email TEXT;
-BEGIN
-  -- 1. Thao tác lấy email và trạng thái admin từ bảng profiles
-  SELECT email, is_admin INTO v_email, v_is_admin
-  FROM public.profiles
-  WHERE user_id = p_user_id;
-
-  -- 2. Dự phòng: lấy thêm email từ bảng auth.users nếu profiles chưa kịp cập nhật email
-  IF v_email IS NULL THEN
-    SELECT email INTO v_email FROM auth.users WHERE id = p_user_id;
-  END IF;
-
-  -- 3. Nếu là tài khoản admin cứng hoặc trường is_admin là true thì trả hành vi ADMIN
-  IF v_email = 'huyxoanls22@gmail.com' OR v_is_admin = true THEN
-    RETURN TRUE;
-  END IF;
-
-  RETURN FALSE;
-END;
-$$;
-
--- Xóa các policy của profiles nếu đã tồn tại để tránh xung đột hoặc trùng lặp
-DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
-DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
-DROP POLICY IF EXISTS "Admins can view all profiles" ON profiles;
-DROP POLICY IF EXISTS "Admins can update all profiles" ON profiles;
-
--- Tạo Policy cho profiles (Sử dụng hàm check_is_admin chạy dưới quyền SECURITY DEFINER để tránh lỗi vòng lặp vô hạn và bảo mật email)
-CREATE POLICY "Users can view their own profile" ON profiles
-  FOR SELECT USING (auth.uid() = user_id OR public.check_is_admin(auth.uid()));
-
-CREATE POLICY "Users can update their own profile" ON profiles
-  FOR UPDATE USING (auth.uid() = user_id OR public.check_is_admin(auth.uid()));
-
--- 2. Tạo Trigger tự động tạo profile khi đăng ký tài khoản thành công mà không ghi đè dữ liệu cũ
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (user_id, email, tier, subscription_type, expires_at)
-  VALUES (new.id, new.email, 'free', null, null)
-  ON CONFLICT (user_id) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
-
--- 3. Tạo bảng trades lưu trữ danh mục lệnh
-CREATE TABLE trades (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE DEFAULT auth.uid() NOT NULL,
-  ticker TEXT NOT NULL,
-  asset_class TEXT NOT NULL,
-  direction TEXT NOT NULL,
-  entry_price NUMERIC NOT NULL,
-  current_price NUMERIC NOT NULL,
-  units NUMERIC NOT NULL,
-  lots NUMERIC,
-  risk_amount NUMERIC NOT NULL,
-  stop_loss TEXT NOT NULL,
-  take_profit TEXT,
-  pnl NUMERIC DEFAULT 0 NOT NULL,
-  trailing_stop_price NUMERIC,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'won', 'lost')),
-  entered_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-  unchecked_warning BOOLEAN DEFAULT false,
-  notes TEXT,
-  sector TEXT,
-  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
-);
-
--- Kích hoạt mã bảo mật Row Level Security (RLS) cho trades
-ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
-
--- Tạo Policy cho phép người dùng xem dữ liệu của chính mình
-CREATE POLICY "Users can view their own trades" ON trades
-  FOR SELECT USING (auth.uid() = user_id);
-
--- Tạo Policy cho phép người dùng tự insert dữ liệu của mình
-CREATE POLICY "Users can insert their own trades" ON trades
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Tạo Policy cho phép người dùng update dữ liệu của mình
-CREATE POLICY "Users can update their own trades" ON trades
-  FOR UPDATE USING (auth.uid() = user_id);
-
--- Tạo Policy cho phép người dùng xoá dữ liệu của mình
-CREATE POLICY "Users can delete their own trades" ON trades
-  FOR DELETE USING (auth.uid() = user_id);`;
-
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(sqlScript);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2000);
-  };
 
   // Derive core values
   const result = calculatePositionSize(setup);
@@ -1087,19 +833,6 @@ CREATE POLICY "Users can delete their own trades" ON trades
     : (setup.accountBalance > 0 ? (setup.riskValue / setup.accountBalance) * 100 : 0);
 
   const requiredMargin = result.notionalValue / leverage;
-
-  if (isLoading && !isUserAdmin) {
-    return (
-      <div className="min-h-screen bg-[#07090E] flex flex-col items-center justify-center text-slate-400">
-        <RotateCcw className="w-8 h-8 animate-spin text-indigo-400 mb-3" />
-        <p className="text-xs font-semibold uppercase tracking-widest">Đang tải cấu hình SaaS & Phân Quyền...</p>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return <SupabaseAuth onAuthSuccess={() => {}} />;
-  }
 
   return (
     <div className="min-h-screen bg-[#0B0E14] text-slate-200 font-sans antialiased selection:bg-indigo-950 selection:text-indigo-300 flex flex-col pb-0">
@@ -1115,21 +848,108 @@ CREATE POLICY "Users can delete their own trades" ON trades
                 RiskWise <span className="text-indigo-400 font-light">Calculator</span>
               </h1>
               <p className="text-[10px] text-slate-450 mt-1 font-semibold">
-                Nền tảng quản lý rủi ro &amp; Giao dịch chuẩn mực
+                Nền tảng quản lý rủi ro &amp; Giao dịch phi tập trung
               </p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Supabase SQL Setup Instructions */}
-            <button
-              onClick={() => setShowSqlSetup(true)}
-              className="p-1.5 px-3 bg-indigo-950/35 hover:bg-indigo-900/45 border border-indigo-900/40 text-indigo-300 hover:text-indigo-200 rounded-xl transition duration-150 flex items-center gap-1.5 text-xs font-semibold cursor-pointer shadow-xs"
-              title="Xem SQL tạo bảng Supabase"
-            >
-              <Database className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden md:inline">SQL Database</span>
-            </button>
+            {/* Affiliate Button with dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowAffiliateDropdown(!showAffiliateDropdown)}
+                className="p-1.5 px-3 bg-indigo-950/30 hover:bg-indigo-900/40 border border-[#1e1b4b] text-indigo-300 hover:text-indigo-200 rounded-xl transition duration-150 flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                title="Đăng ký tài khoản sàn giảm phí giao dịch"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                <span>Ưu đãi sàn (Giảm 20% Phí)</span>
+                <ChevronDown className="w-3 h-3 text-indigo-400" />
+              </button>
+
+              <AnimatePresence>
+                {showAffiliateDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#14171F] border border-slate-850 p-2.5 shadow-2xl z-50 text-left"
+                  >
+                    <div className="px-3 py-2 border-b border-slate-800/50 pb-2 mb-1.5">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Đăng ký sàn giao dịch</span>
+                      <span className="text-[11px] text-slate-400 leading-normal block mt-1">Sử dụng liên kết ưu đãi độc quyền giảm phí 20%:</span>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <a
+                        href={AFFILIATE_LINKS.binance}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-[#1C212D] text-slate-250 transition font-medium"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-yellow-450"></span>
+                          <span>Binance Standard</span>
+                        </div>
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                      </a>
+                      <a
+                        href={AFFILIATE_LINKS.bybit}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-[#1C212D] text-slate-250 transition font-medium"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                          <span>Bybit Exchange</span>
+                        </div>
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                      </a>
+                      <a
+                        href={AFFILIATE_LINKS.okx}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-[#1C212D] text-slate-250 transition font-medium"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+                          <span>OKX Exchange</span>
+                        </div>
+                        <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                      </a>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Offline Local Tools (Backup & Restore) */}
+            <div className="flex items-center bg-[#14171F] p-1 rounded-xl border border-slate-800/80">
+              <button
+                onClick={handleBackup}
+                className="p-1 px-2.5 hover:bg-[#1C212D] text-indigo-400 hover:text-indigo-300 rounded-lg transition duration-150 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                title="Sao lưu toàn bộ dữ liệu ra tệp tin JSON"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden sm:inline">Sao lưu</span>
+              </button>
+              
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1 px-2.5 hover:bg-[#1C212D] text-emerald-400 hover:text-emerald-300 rounded-lg transition duration-150 flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                title="Khôi phục toàn bộ dữ liệu từ tệp tin JSON"
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Khôi phục</span>
+              </button>
+              
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleRestore}
+                accept=".json"
+                className="hidden"
+              />
+            </div>
 
             <button
               id="btn-reset-form"
@@ -1137,25 +957,8 @@ CREATE POLICY "Users can delete their own trades" ON trades
               className="p-1.5 px-3 hover:bg-[#1C212D] border border-slate-800 hover:border-slate-700 rounded-xl text-slate-450 hover:text-slate-200 transition duration-150 flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Đặt lại mặc định</span>
+              <span className="hidden sm:inline">Đặt lại</span>
             </button>
-
-            <div className="h-5 w-px bg-slate-800 hidden sm:block"></div>
-
-            {/* Logged in info & sign out */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-500 font-mono hidden lg:inline-block max-w-[125px] truncate">
-                {session?.user?.email}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="p-1.5 px-3 bg-rose-950/20 hover:bg-rose-950/40 border border-rose-900/30 text-rose-300 hover:text-rose-200 rounded-xl transition duration-150 flex items-center gap-1.5 text-xs font-black cursor-pointer uppercase tracking-wider"
-                title="Đăng xuất khỏi hệ thống"
-              >
-                <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden sm:inline">Đăng xuất</span>
-              </button>
-            </div>
           </div>
         </div>
       </header>
@@ -1173,7 +976,7 @@ CREATE POLICY "Users can delete their own trades" ON trades
             }`}
           >
             <Calculator className="w-4 h-4 text-indigo-400" />
-            Tính Toán & Vào Lệnh
+            Tính Toán &amp; Vào Lệnh
           </button>
           
           <button
@@ -1209,21 +1012,6 @@ CREATE POLICY "Users can delete their own trades" ON trades
               </span>
             )}
           </button>
-
-          {isUserAdmin && (
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
-                activeTab === 'admin'
-                  ? 'border-indigo-505 text-white bg-[#14171F]/50 rounded-t-xl'
-                  : 'border-transparent text-slate-450'
-              }`}
-              id="admin-nav-tab"
-            >
-              <Terminal className="w-4 h-4 text-indigo-400" />
-              Quản Trị Admin
-            </button>
-          )}
         </div>
       </div>
 
@@ -1619,6 +1407,45 @@ CREATE POLICY "Users can delete their own trades" ON trades
                   riskAmount={result.riskAmount} 
                   riskPercentage={riskPct} 
                 />
+
+                {/* Affiliate banner */}
+                <div className="bg-[#14171F] border border-indigo-950/70 rounded-2xl p-4.5 text-xs text-indigo-300 relative overflow-hidden flex items-start gap-3 shadow-xs">
+                  <div className="p-2 rounded-xl bg-indigo-950/50 text-indigo-400 mt-0.5 shrink-0">
+                    <Sparkles className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-100 text-xs tracking-wide uppercase">Mẹo Tối Ưu Chi Phí Trading</h4>
+                    <p className="text-[11px] text-slate-400 leading-relaxed font-sans mt-1">
+                      Kỷ luật quản lý vốn chặt chẽ giúp bạn sống sót lâu dài trong thị trường. Đăng ký tài khoản giao dịch tại các sàn uy tín đối tác để tối ưu hóa thêm 20% chi phí phí:
+                    </p>
+                    <div className="flex gap-2.5 pt-2 flex-wrap">
+                      <a 
+                        href={AFFILIATE_LINKS.binance} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-yellow-450 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                      >
+                        Binance <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <a 
+                        href={AFFILIATE_LINKS.bybit} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-amber-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                      >
+                        Bybit <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <a 
+                        href={AFFILIATE_LINKS.okx} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-cyan-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                      >
+                        OKX <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1664,25 +1491,6 @@ CREATE POLICY "Users can delete their own trades" ON trades
                 onUpdatePlanStatus={handleUpdatePlanStatus}
                 onImportPlanToCalc={handleImportPlanToCalc}
               />
-            </motion.div>
-          )}
-
-          {activeTab === 'admin' && isUserAdmin && (
-            <motion.div
-              key="admin"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              className="pb-12"
-            >
-              <Suspense fallback={
-                <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-                  <div className="w-7 h-7 text-indigo-500 animate-spin rounded-full border-2 border-t-transparent border-indigo-400"></div>
-                  <p className="text-xs text-slate-400">Đang tải bảng điều khiển quản trị viên...</p>
-                </div>
-              }>
-                <AdminDashboard />
-              </Suspense>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1827,417 +1635,6 @@ CREATE POLICY "Users can delete their own trades" ON trades
                   className="py-2.5 px-4 bg-rose-900/50 hover:bg-rose-900/80 text-rose-300 border border-rose-850 text-xs font-bold rounded-xl cursor-pointer transition duration-150"
                 >
                   Vẫn vào (Thiếu kỷ luật)
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* SUPABASE SQL SETUP MODAL */}
-      <AnimatePresence>
-        {showSqlSetup && (
-          <div className="fixed inset-0 bg-[#06080C]/90 backdrop-blur-xs flex items-center justify-center p-4 z-100">
-            <motion.div
-              initial={{ scale: 0.93, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.93, opacity: 0 }}
-              className="bg-[#0E121A]/95 border border-slate-800 rounded-2xl max-w-2xl w-full shadow-2xl relative flex flex-col max-h-[85vh] overflow-hidden"
-            >
-              {/* Header */}
-              <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-[#14171F]/40 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <Database className="w-5 h-5 text-indigo-400" />
-                  <div>
-                    <h3 className="text-sm font-black text-white uppercase tracking-wider font-sans">
-                      Thiết lập Supabase Database (trades)
-                    </h3>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Khởi tạo cấu trúc dữ liệu kết nối đồng bộ an toàn
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowSqlSetup(false)}
-                  className="p-1 px-2.5 bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-slate-100 rounded-lg text-xs font-bold transition duration-150 cursor-pointer"
-                >
-                  Đóng
-                </button>
-              </div>
-
-              {/* Instructions and Code Block */}
-              <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-350 leading-relaxed font-sans">
-                {/* Steps banner */}
-                <div className="bg-indigo-950/15 border border-indigo-900/30 p-3.5 rounded-xl space-y-1">
-                  <span className="font-bold text-indigo-300 block mb-1">💡 Các bước thiết lập trên Supabase:</span>
-                  <ol className="list-decimal pl-4.5 space-y-1 text-slate-400">
-                    <li>Truy cập trang dự án Supabase của bạn tại <a href="https://supabase.com" target="_blank" className="text-indigo-400 hover:underline">supabase.com</a></li>
-                    <li>Tìm đến mục <strong className="text-slate-200">SQL Editor</strong> ở thanh công cụ bên trái</li>
-                    <li>Nhấp vào <strong className="text-slate-200">New Query</strong>, dán toàn bộ đoạn mã SQL dưới đây và chọn <strong className="text-slate-200">Run</strong></li>
-                  </ol>
-                </div>
-
-                {/* SQL Code Preview with Copy Bar */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center bg-[#151924] px-4 py-2 border-t border-x border-slate-800 rounded-t-xl select-none">
-                    <span className="font-mono text-[10px] text-slate-450 uppercase tracking-wider flex items-center gap-1.5 font-bold">
-                      <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-                      supabase_schema.sql
-                    </span>
-                    <button
-                      onClick={handleCopySql}
-                      className="px-2.5 py-1.5 bg-indigo-905 bg-indigo-700/20 text-indigo-300 hover:bg-indigo-700/30 hover:text-indigo-100 rounded-lg text-[10px] font-black transition duration-150 flex items-center gap-1 cursor-pointer select-none border border-indigo-805/40"
-                    >
-                      {copiedSql ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-400" />
-                          Đã sao chép!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          Sao chép SQL
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <pre className="p-4 bg-[#080B11] border border-slate-800 rounded-b-xl max-h-[300px] overflow-auto text-[10px] font-mono text-slate-400 leading-normal scrollbar-thin select-all">
-                    {sqlScript}
-                  </pre>
-                </div>
-
-                {/* Secure warning info */}
-                <p className="text-[10px] text-slate-500 leading-relaxed italic block pt-1 bg-[#14171F]/10">
-                  *Bảng được cấu hình Row Level Security (RLS) bảo mật tuyệt đối, đảm bảo dữ liệu giao dịch của mỗi Nhà đầu tư luôn được cô lập riêng tư dựa trên thông tin phiên Auth User ID của chính họ.
-                </p>
-              </div>
-
-              {/* Footer */}
-              <div className="p-4.5 bg-[#14171F]/40 border-t border-slate-800 flex justify-end shrink-0 select-none">
-                <button
-                  onClick={() => setShowSqlSetup(false)}
-                  className="px-5 py-2 bg-gradient-to-r from-indigo-650 to-indigo-550 hover:from-indigo-600 hover:to-indigo-500 text-white text-xs font-extrabold rounded-xl transition duration-150 shadow-md cursor-pointer uppercase tracking-wider"
-                >
-                  Tôi đã lưu cấu hình
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* FREEMIUM PAYWALL MODAL */}
-      <AnimatePresence>
-        {showPaywall && !isUserAdmin && (
-          <div className="fixed inset-0 bg-[#06080C]/90 backdrop-blur-xs z-100 overflow-y-auto py-10 px-4 flex justify-center items-start sm:items-center animate-fadeIn">
-            <motion.div
-              initial={{ scale: 0.93, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.93, opacity: 0 }}
-              className="bg-[#14171F] border border-indigo-900/50 rounded-2xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative overflow-hidden my-auto"
-            >
-              <div className="absolute right-0 top-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
-
-              {/* Title Section */}
-              <div className="text-center mb-6">
-                <div className="mx-auto w-12 h-12 rounded-xl bg-indigo-950/50 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mb-4 animate-pulse">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-                  Tuyệt vời! Bạn đã hoàn thành 20 lệnh kỷ luật của tháng này.
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 max-w-lg mx-auto leading-relaxed">
-                  Bạn đang xây dựng thói quen giao dịch cực kỳ tốt. Để tiếp tục ghi nhận không giới hạn các lệnh kỷ luật của mình, vui lòng nâng cấp lên tài khoản Premium.
-                </p>
-              </div>
-
-              {/* Content Areas - Subscription plans side by side */}
-              {(() => {
-                // Payment configurations (Dễ dàng thay đổi thông tin STK & ngân hàng nhận tiền ở đây)
-                const paymentConfig = {
-                  bankId: "TCB", // Techcombank
-                  bankName: "Ngân hàng Kỹ thương Việt Nam (Techcombank)",
-                  accountNumber: "19050048400017", // Số tài khoản mới
-                  accountName: "BE QUANG HUY", // Tên chủ tài khoản mới
-                };
-
-                const selectedPrice = selectedPlan === 'monthly' ? 89000 : 828000;
-                const planLabelName = selectedPlan === 'monthly' ? 'Gói Tháng' : 'Gói Năm';
-                const userEmail = session?.user?.email || "abcxyz@gmail.com";
-                // Chuyển khoản tiếng Việt không dấu để các hệ thống ngân hàng dễ tự động khớp nhất
-                const cleanEmail = userEmail.replace(/[^a-zA-Z0-9@.]/g, '').toLowerCase();
-                const transferMemoValue = selectedPlan === 'monthly' 
-                  ? `goi thang ${cleanEmail}` 
-                  : `goi nam ${cleanEmail}`;
-                const syntaxDisplayValue = "goi nam/goi tháng + email";
-
-                return (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                      {/* Monthly Plan Card */}
-                      <div 
-                        onClick={() => setSelectedPlan('monthly')}
-                        className={`p-5 flex flex-col justify-between rounded-xl transition cursor-pointer select-none border ${
-                          selectedPlan === 'monthly' 
-                            ? 'bg-indigo-950/30 border-indigo-500 shadow-md ring-1 ring-indigo-550/40' 
-                            : 'bg-[#1C212D]/40 border-slate-800 hover:border-slate-705 hover:bg-[#1C212D]/60'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Gói Phổ thông</span>
-                            {selectedPlan === 'monthly' ? (
-                              <span className="text-[10.5px] bg-indigo-500/20 text-indigo-300 font-bold px-2 py-0.5 rounded border border-indigo-500/30">Đang chọn</span>
-                            ) : (
-                              <span className="text-[9px] text-slate-500 font-medium opacity-50">Nhấp để chọn</span>
-                            )}
-                          </div>
-                          <h4 className="text-lg font-black text-slate-200 mt-1 uppercase">Gói Tháng</h4>
-                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">Ghi nhật ký, tính toán quy mô lệnh, phân tích danh mục hàng ngày.</p>
-                        </div>
-                        <div className="mt-5 pt-3 border-t border-slate-850 flex items-baseline gap-1.5">
-                          <span className="text-xl font-black text-white">89.000 VNĐ</span>
-                          <span className="text-[11px] text-slate-500 font-medium lowercase"> / Tháng</span>
-                        </div>
-                      </div>
-
-                      {/* Premium Featured annual Plan Card (Highlighted) */}
-                      <div 
-                        onClick={() => setSelectedPlan('annual')}
-                        className={`p-5 flex flex-col justify-between rounded-xl transition cursor-pointer select-none relative overflow-hidden border ${
-                          selectedPlan === 'annual'
-                            ? 'bg-indigo-950/40 border-indigo-500 border-2 shadow-lg shadow-indigo-950/50 ring-1 ring-indigo-500/40'
-                            : 'bg-[#1C212D]/40 border-slate-800 hover:border-slate-705 hover:bg-[#1C212D]/60'
-                        }`}
-                      >
-                        <div className="absolute top-3 right-3 bg-indigo-600 text-white font-black text-[9px] uppercase px-2 py-0.5 rounded-md tracking-wider">
-                          Nổi bật • Tiết kiệm 22%
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block">Kỷ luật gia trọn vẹn</span>
-                            {selectedPlan === 'annual' ? (
-                              <span className="text-[10.5px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-500/30 mr-14">Đang chọn</span>
-                            ) : (
-                              <span className="text-[9px] text-indigo-400 font-medium opacity-50 mr-14">Nhấp để chọn</span>
-                            )}
-                          </div>
-                          <h4 className="text-lg font-black text-white mt-1 uppercase">Gói Năm</h4>
-                          <p className="text-xs text-slate-300 mt-1 leading-relaxed">Xây dựng thói quen bền bỉ cả năm và tiết kiệm chi phí tối đa.</p>
-                        </div>
-                        <div className="mt-5 pt-3 border-t border-indigo-950/80">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-2xl font-black text-white">828.000 VNĐ</span>
-                            <span className="text-[11px] text-indigo-300 font-medium lowercase"> / Năm</span>
-                          </div>
-                          <span className="text-[11px] font-semibold text-indigo-200 block mt-1">chỉ 69.000 VNĐ / tháng</span>
-                          <span className="text-[9px] font-bold text-emerald-400 block mt-1 uppercase">(Tiết kiệm 22% so với gói tháng)</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Highly polished 3-step interactive section */}
-                    <div className="bg-[#1C212D]/40 border border-slate-800 rounded-xl p-5 sm:p-6 space-y-6">
-                      
-                      {/* Step Headers */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block">Quy trình cực kì đơn giản</span>
-                        </div>
-                        <h4 className="text-sm font-black text-slate-202 uppercase tracking-tight text-white">
-                          Hướng dẫn thanh toán nhanh:
-                        </h4>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                          <div className="bg-[#0B0E14]/60 border border-slate-900 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-500/30 text-indigo-400 text-[10px] font-bold flex items-center justify-center">1</span>
-                              <span className="text-[11px] font-bold text-slate-200">Chọn Gói Dịch Vụ</span>
-                            </div>
-                            <p className="text-[10px] text-slate-400 leading-normal">
-                              Bạn đang chọn <span className="text-indigo-400 font-bold underline">{planLabelName}</span>. Nhấp vào các thẻ ở trên để thay đổi gói.
-                            </p>
-                          </div>
-
-                          <div className="bg-[#0B0E14]/60 border border-slate-900 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-500/30 text-indigo-400 text-[10px] font-bold flex items-center justify-center">2</span>
-                              <span className="text-[11px] font-bold text-slate-200">Quét / Nhập Thông Tin</span>
-                            </div>
-                            <p className="text-[10px] text-slate-400 leading-normal">
-                              Quét mã QR bằng ứng dụng ngân hàng hoặc sao chép nhanh chính xác chi tiết tài khoản ở bảng dưới.
-                            </p>
-                          </div>
-
-                          <div className="bg-[#0B0E14]/60 border border-slate-900 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="w-4 h-4 rounded-full bg-indigo-950 border border-indigo-500/30 text-indigo-400 text-[10px] font-bold flex items-center justify-center">3</span>
-                              <span className="text-[11px] font-bold text-slate-200">Hệ Thống Tự Kích Hoạt</span>
-                            </div>
-                            <p className="text-[10px] text-slate-400 leading-normal">
-                              Hệ thống tự động phê duyệt Premium cho email của bạn từ <span className="text-emerald-400 font-bold">5-10 phút</span> sau khi khớp lệnh.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Main Payment details Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 pt-4 border-t border-slate-800/60 items-center">
-                        
-                        {/* Copyable fields Table */}
-                        <div className="md:col-span-7 space-y-3">
-                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block">Thông tin chuyển khoản</span>
-                          
-                          <div className="space-y-1.5">
-                            {/* Bank details card box */}
-                            <div className="bg-[#0b0e14]/80 rounded-xl border border-slate-850 p-4 space-y-2.5">
-                              
-                              {/* Bank Name */}
-                              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-900/60">
-                                <span className="text-slate-400">Ngân hàng:</span>
-                                <span className="text-white font-extrabold">{paymentConfig.bankName}</span>
-                              </div>
-
-                              {/* Account Number */}
-                              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-900/60">
-                                <span className="text-slate-400">Số tài khoản:</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-white font-extrabold tracking-wider">{paymentConfig.accountNumber}</span>
-                                  <button
-                                    onClick={() => handleCopy(paymentConfig.accountNumber, 'accountNo')}
-                                    className="p-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[9px] font-bold text-indigo-300 hover:text-indigo-100 transition flex items-center gap-1 cursor-pointer"
-                                  >
-                                    {copiedField === 'accountNo' ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-emerald-400" />
-                                        <span className="text-emerald-400">Đã chép</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-2.5 h-2.5" />
-                                        <span>Chép</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Account Holder Name */}
-                              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-900/60">
-                                <span className="text-slate-400">Chủ tài khoản:</span>
-                                <span className="text-white font-extrabold uppercase tracking-wide">{paymentConfig.accountName}</span>
-                              </div>
-
-                              {/* Amount with automatic calculation */}
-                              <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-900/60">
-                                <span className="text-slate-400">Số tiền chuyển khoản:</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-indigo-400 font-black tracking-wide">{selectedPrice.toLocaleString('vi-VN')} VNĐ</span>
-                                  <button
-                                    onClick={() => handleCopy(selectedPrice.toString(), 'amountVal')}
-                                    className="p-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[9px] font-bold text-indigo-300 hover:text-indigo-100 transition flex items-center gap-1 cursor-pointer"
-                                  >
-                                    {copiedField === 'amountVal' ? (
-                                      <>
-                                        <Check className="w-3 h-3 text-emerald-400" />
-                                        <span className="text-emerald-400">Đã chép</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Copy className="w-2.5 h-2.5" />
-                                        <span>Chép</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Memo - MUST BE EXTREMELY CLEAR */}
-                              <div className="flex justify-between items-start text-xs pt-1">
-                                <div className="max-w-[65%]">
-                                  <span className="text-[10px] text-emerald-400 font-bold block leading-none mb-1">Cú pháp bắt buộc chính xác:</span>
-                                  <span className="font-mono text-indigo-300 font-black text-[13px] tracking-wide break-all block">{syntaxDisplayValue}</span>
-                                  <span className="text-[9px] text-slate-500 italic mt-1 font-normal block leading-normal text-slate-500">
-                                    Ví dụ: goi nam abcxyz@gmail.com
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => handleCopy(syntaxDisplayValue, 'memoText')}
-                                  className="px-2 py-1.5 rounded-lg bg-indigo-900/40 hover:bg-indigo-900/80 border border-indigo-700/50 text-[10px] font-black text-indigo-200 hover:text-white transition flex items-center gap-1 cursor-pointer mt-1"
-                                >
-                                  {copiedField === 'memoText' ? (
-                                    <>
-                                      <Check className="w-3 h-3 text-emerald-400" />
-                                      <span className="text-emerald-400">Đã chép</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-3 h-3" />
-                                      <span>Sao chép cú pháp</span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="p-3 bg-indigo-950/20 rounded-lg border border-indigo-500/10 flex items-start gap-2">
-                            <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
-                            <p className="text-[10px] text-indigo-200/80 leading-relaxed">
-                              * Bạn vui lòng chép hoặc quét chính xác nội dung ghi chú ở trên. Nội dung chuyển khoản vui lòng ghi GÓI NĂM/GÓI THÁNG KÈM THEO EMAIL CỦA BẠN THEO MẪU TRÊN để hệ thống kích hoạt tự động tài khoản của bạn.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Right Column QR Image Frame */}
-                        <div className="md:col-span-5 flex flex-col items-center justify-center p-4 bg-[#0b0e14]/50 rounded-xl border border-slate-850">
-                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-0.5">Mã QR Thanh Toán</span>
-                          <span className="text-[9px] text-slate-500 text-center mb-3">Tự động gắn số tiền &amp; nội dung chuyển tiền</span>
-
-                          {/* Beautiful QR container */}
-                          <div className="w-40 h-40 bg-white rounded-lg p-2 shadow-inner relative group border border-slate-800">
-                            <img
-                              src={`https://img.vietqr.io/image/${paymentConfig.bankId}-${paymentConfig.accountNumber}-qr_only.png?amount=${selectedPrice}&addInfo=${encodeURIComponent(transferMemoValue)}&accountName=${encodeURIComponent(paymentConfig.accountName)}`}
-                              alt="QR Code Ngân Hàng"
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-contain"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fb = document.getElementById('qr-main-fallback');
-                                if (fb) fb.style.display = 'flex';
-                              }}
-                            />
-                            <div
-                              id="qr-main-fallback"
-                              style={{ display: 'none' }}
-                              className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center text-slate-600 bg-slate-900 rounded"
-                            >
-                              <div className="w-7 h-7 rounded-full border border-slate-800 flex items-center justify-center bg-slate-950">
-                                <span className="font-bold text-[10px] text-indigo-400">QR</span>
-                              </div>
-                              <span className="text-[9px] font-bold uppercase tracking-tight text-slate-400 leading-tight">Mã QR Thanh Toán</span>
-                            </div>
-                          </div>
-
-                          <span className="text-[9px] text-slate-500 text-center mt-3 leading-relaxed">
-                            Mở ứng dụng ngân hàng bất kỳ của bạn, chọn quét QR để nạp tiền nhanh 1 giây!
-                          </span>
-                        </div>
-
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
-
-              {/* Closing / Actions */}
-              <div className="mt-6 flex justify-end gap-3 select-none">
-                <button
-                  onClick={() => setShowPaywall(false)}
-                  className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-xl transition duration-150 cursor-pointer"
-                >
-                  Đóng &amp; Xem Tab khác
                 </button>
               </div>
             </motion.div>
