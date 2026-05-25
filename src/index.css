@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+html, body, #root {
+  background-color: #0B0E14;
+  color: #f1f5f9;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
