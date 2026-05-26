@@ -1645,7 +1645,7 @@ export default function App() {
       {/* Modern minimalist footer block */}
       <footer className="w-full border-t border-slate-800 bg-[#14171F] py-5 px-6 sm:px-8 mt-auto text-center text-[11px] text-slate-550 font-medium">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© RiskWise Platform • Phiên bản quản lý rủi ro giao dịch đột phá dành cho nhà giao dịch kỷ luật.</p>
+          <p>© Được quản trị rủi ro bởi RiskWise - Công cụ quản lý vốn chuyên nghiệp dành cho Trader.</p>
           <p className="font-mono text-[10px] text-slate-500/85 flex items-center gap-1.5 justify-center">
             <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />
             Đọc kĩ Checklist - Bảo toàn nguồn lực vốn.

@@ -498,8 +498,8 @@ export default function PortfolioTracker({
                   <th className="p-3">Loại / Chiều</th>
                   <th className="p-3">Khối lượng</th>
                   <th className="p-3">Mức Giá Vào</th>
-                  <th className="p-3">Trailing Stop</th>
                   <th className="p-3">Stop Loss</th>
+                  <th className="p-3">Trailing Stop</th>
                   <th className="p-3">Giá Chốt Lời</th>
                   <th className="p-3">Rủi ro (% Ngành)</th>
                   <th className="p-3">Giá Hiện Tại</th>
@@ -547,6 +547,9 @@ export default function PortfolioTracker({
                       {/* Entry Price */}
                       <td className="p-3 font-mono text-slate-300">{t.entryPrice.toLocaleString()}</td>
 
+                      {/* SL */}
+                      <td className="p-3 font-mono text-slate-400">{t.stopLoss}</td>
+
                       {/* Trailing Stop Column */}
                       <td className="p-3">
                         {editingTrailingId === t.id ? (
@@ -591,9 +594,6 @@ export default function PortfolioTracker({
                           </div>
                         )}
                       </td>
-
-                      {/* SL */}
-                      <td className="p-3 font-mono text-slate-400">{t.stopLoss}</td>
 
                       {/* Giá chốt lời */}
                       <td className="p-3 font-mono text-emerald-400 font-bold">{t.takeProfit || 'Chưa cài'}</td>
