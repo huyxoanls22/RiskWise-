@@ -841,14 +841,14 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="bg-gradient-to-tr from-indigo-650 to-indigo-550 p-2 rounded-xl shadow-xs text-white">
-              <Calculator className="w-5 h-5" />
+              <ShieldCheck className="w-5 h-5 text-indigo-100" />
             </div>
             <div>
               <h1 className="font-sans font-black text-white text-sm tracking-wide sm:text-base leading-none uppercase">
-                RiskWise <span className="text-indigo-400 font-light">Calculator</span>
+                RiskWise <span className="text-indigo-400 font-light">Management</span>
               </h1>
               <p className="text-[10px] text-slate-450 mt-1 font-semibold">
-                Nền tảng quản lý rủi ro &amp; Giao dịch phi tập trung
+                Nền tảng quản lý rủi ro chuyên nghiệp dành cho Trader
               </p>
             </div>
           </div>
