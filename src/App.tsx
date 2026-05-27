@@ -853,48 +853,47 @@ export default function App() {
     const trade = activeTrades.find(t => t.id === id);
     if (!trade) return;
 
-    // FIX #2: Tính PnL đúng khi đóng lệnh
-    // Ưu tiên: (1) finalPrice nếu có, (2) trade.pnl nếu đã cập nhật giá (bằng flag isPriceUpdated hoặc ≠ 0),
-    // (3) tính từ takeProfit nếu có, (4) KHÔNG dùng riskAmount làm fallback PnL
-    let correctedPnl: number;
-
-    if (trade.currentPrice === trade.entryPrice) {
-      // Nếu giá hiện tại bằng mức giá vào, PnL bằng 0 (Hòa vốn)
-      correctedPnl = 0;
-    } else if (trade.isPriceUpdated || trade.pnl !== 0) {
-      // User đã cập nhật giá hiện tại → dùng floating PnL thực tế
-      correctedPnl = outcome === 'won'
-        ? Math.abs(trade.pnl)
-        : -Math.abs(trade.pnl);
-    } else if (trade.assetClass === 'crypto_stock' && trade.takeProfit && trade.takeProfit !== 'Chưa cài') {
-      // Tính từ takeProfit price nếu có (crypto/stock)
-      const tpPrice = parseFloat(String(trade.takeProfit).replace(/[^0-9.]/g, ''));
-      if (!isNaN(tpPrice) && tpPrice > 0) {
-        const isLong = trade.direction === 'long';
-        const tpPnl = isLong
-          ? (tpPrice - trade.entryPrice) * trade.units
-          : (trade.entryPrice - tpPrice) * trade.units;
-        correctedPnl = outcome === 'won' ? Math.abs(tpPnl) : -Math.abs(trade.riskAmount);
+    // Tính toán "lợi nhuận thực tế" (Locked PnL via Trailing Stop) tương ứng với cột Lợi Nhuận Thực Tế
+    let roundedLocked = 0;
+    if (trade.trailingStopPrice !== undefined && trade.trailingStopPrice !== null) {
+      let lockedPnl = 0;
+      const isLong = trade.direction === 'long';
+      if (trade.assetClass === 'forex') {
+        const pairConfig = FOREX_PAIRS.find(p => p.symbol === trade.ticker);
+        const pipSize = pairConfig?.pipSize || 0.0001;
+        const pipValLot = trade.lots !== undefined 
+          ? (FOREX_PAIRS.find(p => p.symbol === trade.ticker)?.defaultPipValueUSD || 10) 
+          : 10;
+        
+        const pipsDiff = (trade.trailingStopPrice - trade.entryPrice) / pipSize;
+        const multiplier = isLong ? 1 : -1;
+        
+        lockedPnl = pipsDiff * (trade.lots || 0) * pipValLot * multiplier;
       } else {
-        // Không đủ thông tin → dùng riskAmount có cảnh báo
-        correctedPnl = outcome === 'won' ? trade.riskAmount : -trade.riskAmount;
+        const priceDiff = isLong ? (trade.trailingStopPrice - trade.entryPrice) : (trade.entryPrice - trade.trailingStopPrice);
+        lockedPnl = priceDiff * trade.units;
       }
+      roundedLocked = Math.round(lockedPnl * 100) / 100;
+    }
+
+    let correctedPnl: number;
+    let finalOutcome: 'won' | 'lost' = outcome;
+
+    if (roundedLocked > 0) {
+      // Nếu cột "lợi nhuận thực tế" có giá trị (> 0), lấy theo cột đó
+      correctedPnl = roundedLocked;
+      finalOutcome = 'won';
     } else {
-      // Fallback cuối: riskAmount — nhưng user nên được nhắc cập nhật giá trước
-      correctedPnl = outcome === 'won' ? trade.riskAmount : -trade.riskAmount;
+      // Nếu không, lấy theo cột "lợi nhuận (PNL)" bên cạnh (trade.pnl)
+      correctedPnl = trade.pnl;
+      finalOutcome = trade.pnl >= 0 ? 'won' : 'lost';
     }
 
     const finalPnl = Math.round(correctedPnl * 100) / 100;
 
-    // BONUS: Nhắc user nếu PnL chưa được cập nhật (trade.pnl === 0 nghĩa là chưa update giá)
-    if (trade.pnl === 0 && outcome === 'won') {
-      // Không block, chỉ log để biết PnL có thể không chính xác
-      console.warn(`[handleCloseTrade] Trade ${trade.ticker}: PnL = 0 khi đóng lệnh thắng. Cân nhắc cập nhật giá hiện tại trước khi đóng để thống kê chính xác hơn.`);
-    }
-
     const closed: PortfolioTrade = {
       ...trade,
-      status: outcome,
+      status: finalOutcome,
       pnl: finalPnl,
       enteredAt: trade.enteredAt
     };

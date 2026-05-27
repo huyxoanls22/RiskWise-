@@ -216,7 +216,33 @@ export default function PortfolioTracker({
   const lossCount = closedTrades.filter(t => t.status === 'lost').length;
   const totalClosedCount = closedTrades.length;
   const winRate = totalClosedCount > 0 ? (winCount / totalClosedCount) * 100 : 0;
-  const totalRealizedPnl = closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  
+  // Tổng Lời/Lỗ Thực Tế dựa trên cột 'Lợi Nhuận Thực Tế' (đã khoá lời bằng Trailing Stop) của các vị thế đang mở
+  const totalRealizedPnl = activeTrades.reduce((sum, t) => {
+    if (t.trailingStopPrice === undefined || t.trailingStopPrice === null) {
+      return sum;
+    }
+    
+    let lockedPnl = 0;
+    const isLong = t.direction === 'long';
+    
+    if (t.assetClass === 'forex') {
+      const pairConfig = FOREX_PAIRS.find(p => p.symbol === t.ticker);
+      const pipSize = pairConfig?.pipSize || 0.0001;
+      const pipValLot = t.lots !== undefined ? (FOREX_PAIRS.find(p => p.symbol === t.ticker)?.defaultPipValueUSD || 10) : 10;
+      
+      const pipsDiff = (t.trailingStopPrice - t.entryPrice) / pipSize;
+      const multiplier = isLong ? 1 : -1;
+      
+      lockedPnl = pipsDiff * (t.lots || 0) * pipValLot * multiplier;
+    } else {
+      const priceDiff = isLong ? (t.trailingStopPrice - t.entryPrice) : (t.entryPrice - t.trailingStopPrice);
+      lockedPnl = priceDiff * t.units;
+    }
+    
+    const roundedLocked = Math.round(lockedPnl * 100) / 100;
+    return sum + (roundedLocked > 0 ? roundedLocked : 0);
+  }, 0);
 
   // Expected Value (EV) calculation: (WinRate * AvgWin) - (LossRate * AvgLoss)
   const getEV = () => {
@@ -298,7 +324,7 @@ export default function PortfolioTracker({
               {totalRealizedPnl >= 0 ? '+' : ''}${totalRealizedPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[10px] text-slate-450 mt-1">Từ các vị thế đã đóng chốt.</p>
+          <p className="text-[10px] text-slate-450 mt-1">Lợi nhuận đã khóa bằng Trailing Stop của vị thế đang mở.</p>
         </div>
 
         {/* Win Rate */}
