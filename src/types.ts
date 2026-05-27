@@ -67,6 +67,7 @@ export interface PortfolioTrade {
   status: 'active' | 'won' | 'lost';
   enteredAt: string;
   uncheckedWarning: boolean; // whether warning was issued (i.e. check list wasn't fully checked)
+  isPriceUpdated?: boolean; // whether current price has been explicitly updated by user
   notes?: string;
   sector?: string;
 }

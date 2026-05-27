@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PortfolioTrade, ChecklistItem, DailyLimitLog } from '../types';
 import { 
@@ -46,6 +46,7 @@ interface PortfolioTrackerProps {
   onUpdateTrailingStop: (id: string, price: number | undefined) => void;
   onLogTrade: (trade: Omit<PortfolioTrade, 'id' | 'pnl' | 'status' | 'enteredAt'>) => void;
   accountBalance: number;
+  dailyLimitPercent?: number;
   dailyDisciplineLogs: DailyLimitLog[];
   onClearDisciplineLogs?: () => void;
 }
@@ -60,6 +61,7 @@ export default function PortfolioTracker({
   onUpdateTrailingStop,
   onLogTrade,
   accountBalance,
+  dailyLimitPercent,
   dailyDisciplineLogs,
   onClearDisciplineLogs
 }: PortfolioTrackerProps) {
@@ -70,6 +72,22 @@ export default function PortfolioTracker({
   const [isSimulating, setIsSimulating] = useState(false);
   const [showResetLogsModal, setShowResetLogsModal] = useState(false);
   const [resetPhraseInput, setResetPhraseInput] = useState('');
+
+  // Dynamically recalculate dailyLimitLogs based on current accountBalance and dailyLimitPercent
+  const mappedDisciplineLogs = useMemo(() => {
+    const dLimitPercent = dailyLimitPercent || 0;
+    const dynamicAllowedLimit = dLimitPercent > 0 ? (accountBalance * (dLimitPercent / 100)) : 0;
+    
+    return dailyDisciplineLogs.map(log => {
+      const allowed = dynamicAllowedLimit > 0 ? dynamicAllowedLimit : log.allowedLimit;
+      const isExceeded = allowed > 0 ? (log.totalRisk > allowed) : log.isExceeded;
+      return {
+        ...log,
+        allowedLimit: allowed,
+        isExceeded
+      };
+    });
+  }, [dailyDisciplineLogs, accountBalance, dailyLimitPercent]);
 
   // Sector Risk calculation
   const totalActiveRisk = activeTrades.reduce((sum, t) => sum + t.riskAmount, 0);
@@ -855,9 +873,9 @@ export default function PortfolioTracker({
         <div className="flex items-center justify-between pb-2 border-b border-slate-805">
           <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
             <Scale className="w-4 h-4 text-violet-400" />
-            Lịch Sử Kỷ Luật & Chỉ Số Tuân Thủ Daily Limit ({dailyDisciplineLogs.length})
+            Lịch Sử Kỷ Luật & Chỉ Số Tuân Thủ Daily Limit ({mappedDisciplineLogs.length})
           </h3>
-          {onClearDisciplineLogs && dailyDisciplineLogs.length > 0 && (
+          {onClearDisciplineLogs && mappedDisciplineLogs.length > 0 && (
             <button
               onClick={() => {
                 setShowResetLogsModal(true);
@@ -871,7 +889,7 @@ export default function PortfolioTracker({
           )}
         </div>
 
-        {dailyDisciplineLogs.length === 0 ? (
+        {mappedDisciplineLogs.length === 0 ? (
           <div className="text-center py-10 border border-dashed border-slate-800 rounded-2xl bg-[#14171F]/10">
             <Calendar className="w-6 h-6 text-slate-700 mx-auto mb-2" />
             <p className="text-[11px] text-slate-400">Chưa ghi nhận ngày giao dịch nào có thiết lập Daily Limit.</p>
@@ -881,8 +899,8 @@ export default function PortfolioTracker({
           <div className="space-y-4">
             {/* Discipline KPI Cards */}
             {(() => {
-              const totalDays = dailyDisciplineLogs.length;
-              const breachedDays = dailyDisciplineLogs.filter(l => l.isExceeded).length;
+              const totalDays = mappedDisciplineLogs.length;
+              const breachedDays = mappedDisciplineLogs.filter(l => l.isExceeded).length;
               const disciplinedDays = totalDays - breachedDays;
               const score = totalDays > 0 ? Math.round((disciplinedDays / totalDays) * 100) : 100;
 
@@ -962,7 +980,7 @@ export default function PortfolioTracker({
             {/* Daily limit historical table */}
             <div className="bg-[#14171F] border border-slate-800/65 rounded-2xl overflow-hidden">
               <div className="divide-y divide-slate-805">
-                {dailyDisciplineLogs.map((log) => {
+                {mappedDisciplineLogs.map((log) => {
                   const dObj = new Date(log.date);
                   const formattedDate = isNaN(dObj.getTime())
                     ? log.date

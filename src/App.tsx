@@ -658,11 +658,14 @@ export default function App() {
     if (!trade) return;
 
     // FIX #2: Tính PnL đúng khi đóng lệnh
-    // Ưu tiên: (1) finalPrice nếu có, (2) trade.pnl nếu đã cập nhật giá (≠ 0),
+    // Ưu tiên: (1) finalPrice nếu có, (2) trade.pnl nếu đã cập nhật giá (bằng flag isPriceUpdated hoặc ≠ 0),
     // (3) tính từ takeProfit nếu có, (4) KHÔNG dùng riskAmount làm fallback PnL
     let correctedPnl: number;
 
-    if (trade.pnl !== 0) {
+    if (trade.currentPrice === trade.entryPrice) {
+      // Nếu giá hiện tại bằng mức giá vào, PnL bằng 0 (Hòa vốn)
+      correctedPnl = 0;
+    } else if (trade.isPriceUpdated || trade.pnl !== 0) {
       // User đã cập nhật giá hiện tại → dùng floating PnL thực tế
       correctedPnl = outcome === 'won'
         ? Math.abs(trade.pnl)
@@ -706,6 +709,12 @@ export default function App() {
       return [closed, ...history];
     });
     setActiveTrades(prev => prev.filter(t => t.id !== id));
+    
+    // Cập nhật số dư tài khoản bằng cách cộng PnL của vị thế vừa đóng
+    setSetup(prev => ({
+      ...prev,
+      accountBalance: Math.round((prev.accountBalance + finalPnl) * 100) / 100
+    }));
   };
 
   const handleDeleteClosedTrade = (id: string) => {
@@ -773,7 +782,8 @@ export default function App() {
       return {
         ...trade,
         currentPrice: newPrice,
-        pnl: finalPnl
+        pnl: finalPnl,
+        isPriceUpdated: true
       };
     }));
   };
@@ -1468,6 +1478,7 @@ export default function App() {
                 onUpdateTrailingStop={handleUpdateTrailingStop}
                 onLogTrade={() => {}}
                 accountBalance={setup.accountBalance}
+                dailyLimitPercent={setup.dailyLimitPercent}
                 dailyDisciplineLogs={dailyDisciplineLogs}
                 onClearDisciplineLogs={() => {
                   setDailyDisciplineLogs([]);
