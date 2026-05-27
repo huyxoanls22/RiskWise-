@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AssetClass, TradeSetup, CalculationResult, ChecklistItem, PortfolioTrade, TradingPlan, DailyLimitLog } from './types';
 import { calculatePositionSize, FOREX_PAIRS } from './utils/calculator';
+import { verifyLicenseKey } from './utils/license';
 import ForexCalculator from './components/ForexCalculator';
 import CryptoStockCalculator from './components/CryptoStockCalculator';
 import RiskMeter from './components/RiskMeter';
@@ -25,14 +26,17 @@ import {
   Info,
   CheckCircle2,
   Database,
-  Code,
   Terminal,
   Copy,
   Check,
   Download,
   Upload,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Crown,
+  CreditCard,
+  Calendar,
+  X
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -149,9 +153,189 @@ export default function App() {
 
   // Offline defaults - Unlimited access
   const isUserAdmin = false;
-  const isPremium = true;
+  
+  // Real Local Premium State (Initially false for normal users to trigger Paywall upon 21st order)
+  const [isPremium, setIsPremium] = useState<boolean>(() => {
+    try {
+      const persisted = localStorage.getItem('trading_is_premium');
+      return persisted === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Sync isPremium to localStorage
+  useEffect(() => {
+    localStorage.setItem('trading_is_premium', String(isPremium));
+  }, [isPremium]);
+
+  // Track the premium license expiry date format
+  const [premiumExpiry, setPremiumExpiry] = useState<string>(() => {
+    try {
+      const savedKey = localStorage.getItem("trading_license_key");
+      const savedEmail = localStorage.getItem("trading_license_email");
+      if (savedKey && savedEmail) {
+        const verification = verifyLicenseKey(savedEmail, savedKey);
+        if (verification.isValid && verification.expiryDate) {
+          return verification.expiryDate.toLocaleDateString('vi-VN');
+        }
+      }
+    } catch {}
+    return "Trọn đời (Unlimited)";
+  });
+
+  // Cumulative total trades activated counter inside localStorage
+  const [totalTradesActivated, setTotalTradesActivated] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem('total_trades_activated');
+      return val ? parseInt(val, 10) || 0 : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  // Time bypass protection states
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [isOfflineTimeHack, setIsOfflineTimeHack] = useState<boolean>(false);
+  const [timeStatusMessage, setTimeStatusMessage] = useState<string>("");
+
+  // System startup hook: fetches secure public internet time, prevent offline lùi giờ hacking, validates license expiry
+  useEffect(() => {
+    const validateTimeAndLicense = async () => {
+      let now = new Date();
+      let isOffline = false;
+
+      try {
+        setTimeStatusMessage("Đang đối soát thời gian thực tế...");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5 seconds local timeout
+
+        const res = await fetch("https://worldtimeapi.org/api/timezone/Etc/UTC", { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.utc_datetime) {
+            now = new Date(data.utc_datetime);
+          }
+        } else {
+          isOffline = true;
+        }
+      } catch {
+        isOffline = true;
+      }
+
+      // Check max_time_recorded from localStorage
+      let maxTimeRecordedMs = 0;
+      try {
+        const storedMax = localStorage.getItem("max_time_recorded");
+        if (storedMax) {
+          maxTimeRecordedMs = parseInt(storedMax, 10) || 0;
+        }
+      } catch {}
+
+      const currentSystemMs = Date.now();
+
+      if (isOffline) {
+        if (currentSystemMs < maxTimeRecordedMs) {
+          // Time-bypass hacking detected (User changed system clock backward)
+          setIsOfflineTimeHack(true);
+          setTimeStatusMessage("Cảnh báo: Phát hiện lùi thời gian thiết bị! Hãy kết nối mạng Internet để mở khóa.");
+        } else {
+          localStorage.setItem("max_time_recorded", String(currentSystemMs));
+        }
+      } else {
+        // Online: record highest possible time marker
+        const finalMaxTime = Math.max(currentSystemMs, now.getTime(), maxTimeRecordedMs);
+        localStorage.setItem("max_time_recorded", String(finalMaxTime));
+      }
+
+      setCurrentTime(now);
+
+      // Perform automatic license checks based on the reliable clock
+      try {
+        const savedKey = localStorage.getItem("trading_license_key");
+        const savedEmail = localStorage.getItem("trading_license_email");
+        if (savedKey && savedEmail) {
+          const verification = verifyLicenseKey(savedEmail, savedKey);
+          if (verification.isValid && verification.expiryDate) {
+            if (now >= verification.expiryDate) {
+              // Grace period / license expired
+              setIsPremium(false);
+              localStorage.setItem("trading_is_premium", "false");
+              setTimeStatusMessage(`Gói bản quyền Premium (${savedEmail}) đã hết hạn sử dụng!`);
+              setShowPaywall(true);
+            } else {
+              setIsPremium(true);
+              localStorage.setItem("trading_is_premium", "true");
+              setPremiumExpiry(verification.expiryDate.toLocaleDateString("vi-VN"));
+            }
+          } else {
+            setIsPremium(false);
+            localStorage.setItem("trading_is_premium", "false");
+          }
+        }
+      } catch (e) {
+        console.error("Error confirming local license state:", e);
+      }
+    };
+
+    validateTimeAndLicense();
+  }, []);
+
   const [showPaywall, setShowPaywall] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [paywallPlan, setPaywallPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  // States for activation inputs
+  const [activationEmail, setActivationEmail] = useState('');
+  const [activationKey, setActivationKey] = useState('');
+  const [activationError, setActivationError] = useState<string | null>(null);
+  const [isVerifyingActivation, setIsVerifyingActivation] = useState(false);
+
+
+
+  const handleActivatePro = () => {
+    setActivationError(null);
+    const email = activationEmail.trim();
+    const key = activationKey.trim();
+
+    if (!email || !email.includes('@')) {
+      setActivationError("Vui lòng nhập địa chỉ Email hợp lệ!");
+      return;
+    }
+    if (!key) {
+      setActivationError("Vui lòng nhập License Key Pro kích hoạt!");
+      return;
+    }
+
+    setIsVerifyingActivation(true);
+    setTimeout(() => {
+      setIsVerifyingActivation(false);
+      const verification = verifyLicenseKey(email, key);
+      if (verification.isValid && verification.expiryDate) {
+        const now = currentTime || new Date();
+        if (now >= verification.expiryDate) {
+          setActivationError(`Mã kích hoạt này đã hết hạn vào ngày ${verification.expiryDate.toLocaleDateString('vi-VN')}! Vui lòng gia hạn.`);
+          return;
+        }
+
+        // Success!
+        setIsPremium(true);
+        localStorage.setItem('trading_is_premium', 'true');
+        localStorage.setItem('trading_license_key', key);
+        localStorage.setItem('trading_license_email', email);
+        setPremiumExpiry(verification.expiryDate.toLocaleDateString('vi-VN'));
+        setPaymentSuccess(true);
+        setActivationEmail('');
+        setActivationKey('');
+      } else {
+        setActivationError(verification.error || "Mã kích hoạt không đúng hoặc Email không đúng!");
+      }
+    }, 1200);
+  };
 
   // Portfolio active positions from localStorage
   const [activeTrades, setActiveTrades] = useState<PortfolioTrade[]>(() => {
@@ -226,6 +410,14 @@ export default function App() {
     newTradeRisk: 0,
     allowedLimitUSD: 0
   });
+
+  const handleCopyPaymentInfo = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(id);
+    setTimeout(() => {
+      setCopiedField(null);
+    }, 1800);
+  };
 
   // Export JSON Backup
   const handleBackup = () => {
@@ -486,11 +678,8 @@ export default function App() {
   };
 
   const handleAttemptLogTrade = () => {
-    // Freemium Monthly subscription quota protection
-    const orderCount = getMonthlySavedCount();
-    const shouldShowPaywall = (orderCount >= 20 && !isPremium && !isUserAdmin);
-
-    if (shouldShowPaywall) {
+    // Local Freemium Lifetime limit protection (Max 20 saved trades)
+    if (!isPremium && totalTradesActivated > 20) {
       setShowPaywall(true);
       return;
     }
@@ -646,6 +835,13 @@ export default function App() {
         updated.unshift(newLog);
       }
       return updated;
+    });
+
+    // Increment and persist total lifetime trade activation count
+    setTotalTradesActivated(prev => {
+      const nextVal = prev + 1;
+      localStorage.setItem('total_trades_activated', String(nextVal));
+      return nextVal;
     });
 
     setShowWarningModal(false);
@@ -864,6 +1060,26 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* Premium Indicator Badge/Toggle Button */}
+            {isPremium ? (
+              <div 
+                onClick={() => setShowPaywall(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/35 rounded-xl text-[11px] font-black cursor-pointer transition uppercase tracking-wider select-none shadow-sm shadow-amber-950/40"
+                title="Xem thông tin Premium VIP của bạn"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>PREMIUM VIP</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowPaywall(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 border border-amber-500/20 text-slate-900 rounded-xl text-[11px] font-black cursor-pointer transition uppercase tracking-wider select-none shadow-md shadow-amber-950/30 font-sans"
+                title="Nâng cấp Premium gỡ bỏ giới hạn rủi ro"
+              >
+                <Crown className="w-3.5 h-3.5 text-slate-900" />
+                <span>Nâng cấp VIP</span>
+              </button>
+            )}
             {/* Affiliate Button with dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -990,7 +1206,14 @@ export default function App() {
           </button>
           
           <button
-            onClick={() => setActiveTab('portfolio')}
+            onClick={() => {
+              if (!isPremium && totalTradesActivated > 20) {
+                setShowPaywall(true);
+              } else if (isOfflineTimeHack) {
+                setShowPaywall(true);
+              }
+              setActiveTab('portfolio');
+            }}
             className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
               activeTab === 'portfolio'
                 ? 'border-emerald-500 text-white bg-[#14171F]/50 rounded-t-xl'
@@ -1007,7 +1230,14 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('plans')}
+            onClick={() => {
+              if (!isPremium && totalTradesActivated > 20) {
+                setShowPaywall(true);
+              } else if (isOfflineTimeHack) {
+                setShowPaywall(true);
+              }
+              setActiveTab('plans');
+            }}
             className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
               activeTab === 'plans'
                 ? 'border-yellow-500 text-white bg-[#14171F]/50 rounded-t-xl'
@@ -1466,24 +1696,48 @@ export default function App() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
-              className="pb-12"
+              className="pb-12 relative min-h-[400px]"
             >
-              <PortfolioTracker
-                activeTrades={activeTrades}
-                closedTrades={closedTrades}
-                onCloseTrade={handleCloseTrade}
-                onDeleteClosedTrade={handleDeleteClosedTrade}
-                onClearHistory={handleClearClosedHistory}
-                onUpdateCurrentPrice={handleUpdateCurrentPrice}
-                onUpdateTrailingStop={handleUpdateTrailingStop}
-                onLogTrade={() => {}}
-                accountBalance={setup.accountBalance}
-                dailyLimitPercent={setup.dailyLimitPercent}
-                dailyDisciplineLogs={dailyDisciplineLogs}
-                onClearDisciplineLogs={() => {
-                  setDailyDisciplineLogs([]);
-                }}
-              />
+              <div className={(!isPremium && totalTradesActivated > 20) || isOfflineTimeHack ? "blur-md pointer-events-none select-none opacity-45 transition-all duration-300" : ""}>
+                <PortfolioTracker
+                  activeTrades={activeTrades}
+                  closedTrades={closedTrades}
+                  onCloseTrade={handleCloseTrade}
+                  onDeleteClosedTrade={handleDeleteClosedTrade}
+                  onClearHistory={handleClearClosedHistory}
+                  onUpdateCurrentPrice={handleUpdateCurrentPrice}
+                  onUpdateTrailingStop={handleUpdateTrailingStop}
+                  onLogTrade={() => {}}
+                  accountBalance={setup.accountBalance}
+                  dailyLimitPercent={setup.dailyLimitPercent}
+                  dailyDisciplineLogs={dailyDisciplineLogs}
+                  onClearDisciplineLogs={() => {
+                    setDailyDisciplineLogs([]);
+                  }}
+                />
+              </div>
+
+              {((!isPremium && totalTradesActivated > 20) || isOfflineTimeHack) && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-[#0B0D13]/70 rounded-2xl text-center border border-amber-500/25 backdrop-blur-xs min-h-[300px] shadow-2xl">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-4">
+                    <Crown className="w-7 h-7 text-amber-400" />
+                  </div>
+                  <h3 className="text-sm font-black text-amber-400 uppercase tracking-widest mb-1.5">
+                    {isOfflineTimeHack ? "PHÁT HIỆN SAI LỆCH THỜI GIAN" : "HẠN MỨC FREE ĐÃ HẾT"}
+                  </h3>
+                  <p className="text-xs text-slate-300 max-w-sm leading-relaxed mb-5 font-sans font-medium">
+                    {isOfflineTimeHack 
+                      ? "Phát hiện lùi thời gian thiết bị so với mốc thời gian thực tế đã ghi nhận trước đó. Vui lòng kết nối Internet để kiểm tra."
+                      : "Bạn đã dùng hết hạn mức 20 lệnh lưu miễn phí trọn đời. Vui lòng nâng cấp Premium VIP để theo dõi danh mục vị thế đang mở không giới hạn."}
+                  </p>
+                  <button
+                    onClick={() => setShowPaywall(true)}
+                    className="px-6 py-2.5 bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider select-none shrink-0 cursor-pointer shadow-md shadow-amber-950/20"
+                  >
+                    NÂNG CẤP PREMIUM VIP
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -1493,15 +1747,39 @@ export default function App() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
-              className="pb-12"
+              className="pb-12 relative min-h-[400px]"
             >
-              <TradingPlanManager
-                plans={plans}
-                onAddPlan={handleAddPlan}
-                onDeletePlan={handleDeletePlan}
-                onUpdatePlanStatus={handleUpdatePlanStatus}
-                onImportPlanToCalc={handleImportPlanToCalc}
-              />
+              <div className={(!isPremium && totalTradesActivated > 20) || isOfflineTimeHack ? "blur-md pointer-events-none select-none opacity-45 transition-all duration-300" : ""}>
+                <TradingPlanManager
+                  plans={plans}
+                  onAddPlan={handleAddPlan}
+                  onDeletePlan={handleDeletePlan}
+                  onUpdatePlanStatus={handleUpdatePlanStatus}
+                  onImportPlanToCalc={handleImportPlanToCalc}
+                />
+              </div>
+
+              {((!isPremium && totalTradesActivated > 20) || isOfflineTimeHack) && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-[#0B0D13]/70 rounded-2xl text-center border border-amber-500/25 backdrop-blur-xs min-h-[300px] shadow-2xl">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-4">
+                    <Crown className="w-7 h-7 text-amber-400" />
+                  </div>
+                  <h3 className="text-sm font-black text-amber-400 uppercase tracking-widest mb-1.5">
+                    {isOfflineTimeHack ? "PHÁT HIỆN SAI LỆCH THỜI GIAN" : "HẠN MỨC FREE ĐÃ HẾT"}
+                  </h3>
+                  <p className="text-xs text-slate-300 max-w-sm leading-relaxed mb-5 font-sans font-medium">
+                    {isOfflineTimeHack 
+                      ? "Phát hiện lùi thời gian thiết bị so với mốc thời gian thực tế đã ghi nhận trước đó. Vui lòng kết nối Internet để kiểm tra."
+                      : "Bạn đã dùng hết hạn mức 20 lệnh lưu miễn phí trọn đời. Vui lòng nâng cấp Premium VIP để theo dõi kế hoạch khớp lệnh kỷ luật."}
+                  </p>
+                  <button
+                    onClick={() => setShowPaywall(true)}
+                    className="px-6 py-2.5 bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider select-none shrink-0 cursor-pointer shadow-md shadow-amber-950/20"
+                  >
+                    NÂNG CẤP PREMIUM VIP
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -1621,7 +1899,7 @@ export default function App() {
                 <p>
                   Bạn chưa tích chọn đầy đủ các tiêu chí <span className="text-rose-400 font-bold uppercase">Bắt buộc</span> trong Checklist giao dịch trước khi vào lệnh.
                 </p>
-                <div className="p-3 bg-[#1C212D]/60 border border-rose-950 rounded-xl text-left text-[11px] font-medium text-rose-300">
+                <div className="p-3 bg-[#1C212D]/60 border border-rose-950 rounded-xl text-left text-[11px] font-medium text-rose-300 font-sans">
                   <span className="font-bold block text-rose-400 mb-1">Các tiêu chí bị bỏ qua gồm:</span>
                   <ul className="list-disc leading-relaxed pl-4 space-y-1">
                     {checklist.filter(item => item.isRequired && !item.isChecked).map(item => (
@@ -1636,17 +1914,376 @@ export default function App() {
 
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => setShowWarningModal(false)}
-                  className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer transition duration-150"
+                  className="py-2.5 px-4 bg-[#1e2330] hover:bg-slate-700 text-slate-350 text-xs font-bold rounded-xl cursor-pointer transition duration-150 font-sans"
                 >
                   Quay lại Checklist
                 </button>
                 <button
+                  type="button"
                   onClick={() => executeAndLogTrade(true)} // force pass, marked as unchecked warning
-                  className="py-2.5 px-4 bg-rose-900/50 hover:bg-rose-900/80 text-rose-300 border border-rose-850 text-xs font-bold rounded-xl cursor-pointer transition duration-150"
+                  className="py-2.5 px-4 bg-rose-950/50 hover:bg-rose-900/40 text-rose-300 border border-rose-900/30 text-xs font-bold rounded-xl cursor-pointer transition duration-150 font-sans"
                 >
-                  Vẫn vào (Thiếu kỷ luật)
+                  Vẫn giao dịch
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* PREMIUM PAYWALL MODAL (Rule 5 & 10) */}
+      <AnimatePresence>
+        {showPaywall && (
+          <div className="fixed inset-0 bg-[#06080C]/90 backdrop-blur-xs flex items-center justify-center p-3 z-100 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="bg-[#141720] border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-2xl w-full my-auto shadow-2xl relative overflow-hidden max-h-[95vh] flex flex-col"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setShowPaywall(false)}
+                className="absolute right-4 top-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="overflow-y-auto pr-1 custom-scrollbar space-y-4 flex-1 select-none">
+                {isPremium ? (
+                  <div id="premium-active-panel" className="text-center py-5 space-y-4">
+                    <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center shadow-lg shadow-amber-950/20">
+                      <Crown className="w-7 h-7 text-amber-400 animate-pulse" />
+                    </div>
+
+                    <h3 className="text-lg font-black text-amber-400 uppercase tracking-widest font-sans">
+                      BẠN LÀ THÀNH VIÊN PREMIUM!
+                    </h3>
+                    <p className="text-[11px] text-indigo-400 uppercase tracking-widest font-semibold font-sans">
+                      CƠ CHẾ BẢO MẬT VIÊN MÀN - KỶ LUẬT CHIẾN THẮNG
+                    </p>
+
+                    <div className="p-4 bg-[#10131A] border border-slate-850 rounded-2xl max-w-md mx-auto text-left space-y-2.5 text-xs sm:text-sm leading-relaxed font-sans">
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-850/60">
+                        <span className="text-slate-400 font-medium">Email bản quyền:</span>
+                        <span className="font-bold text-slate-100">{localStorage.getItem('trading_license_email') || 'huyxoanls22@gmail.com'}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-850/60 font-sans">
+                        <span className="text-slate-400 font-medium font-sans">Trạng thái:</span>
+                        <span className="flex items-center gap-1.5 text-emerald-400 font-extrabold uppercase text-[10px] tracking-wider font-sans">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                          Đã kích hoạt bản quyền
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-850/60 font-sans">
+                        <span className="text-slate-400 font-medium font-sans">Tính năng PRO:</span>
+                        <span className="font-bold text-slate-100 flex items-center gap-1 font-sans">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          Mở khoá toàn phần 100%
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center font-sans">
+                        <span className="text-slate-400 font-medium font-sans">Hạn dùng (Bản quyền):</span>
+                        <span className="font-extrabold text-amber-400 flex items-center gap-1 font-mono text-xs">
+                          <Calendar className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          {premiumExpiry}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-slate-400 text-xs leading-relaxed max-w-md mx-auto font-sans">
+                      Tài khoản của bạn đã được chứng thực bằng thuật toán giải mã cục bộ. Toàn bộ vị thế mở rộng đã sẵn sàng phục vụ bạn trọn đời.
+                    </p>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center items-center font-sans">
+                      <button
+                        onClick={() => setShowPaywall(false)}
+                        className="w-full sm:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl cursor-pointer transition uppercase tracking-wider font-sans"
+                      >
+                        Quay lại màn hình chính
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsPremium(false);
+                          localStorage.setItem('trading_is_premium', 'false');
+                          localStorage.removeItem('trading_license_key');
+                          localStorage.removeItem('trading_license_email');
+                          setPaymentSuccess(false);
+                        }}
+                        className="text-rose-400 hover:text-rose-300 text-xs font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:underline transition font-sans"
+                      >
+                        Huỷ trạng thái Premium (Về Free Demo)
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* CHECKOUT / UPGRADE FLOW */
+                  <div id="premium-checkout-panel">
+                    {paymentSuccess ? (
+                      /* SUCCESS SCREEN */
+                      <motion.div
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="text-center py-7 space-y-4 font-sans"
+                      >
+                        <div className="mx-auto w-14 h-14 rounded-full bg-emerald-950/20 border border-emerald-500 text-emerald-400 flex items-center justify-center shadow-xl">
+                          <Check className="w-7 h-7 text-emerald-400 font-bold" />
+                        </div>
+                        <h3 className="text-base font-black text-white uppercase tracking-widest font-sans">
+                          KÍCH HOẠT THÀNH CÔNG!
+                        </h3>
+                        <p className="text-emerald-400 text-xs font-bold uppercase tracking-wider mt-1 font-sans">
+                          Chào mừng bạn đến với RiskWise Premium Pro
+                        </p>
+                        <p className="text-slate-350 text-sm leading-relaxed max-w-md mx-auto mt-2 px-4 font-normal font-sans">
+                          Bản quyền của bạn đã kích hoạt thành công trên thiết bị này! Các Tab nâng cao đã được mở rộng.
+                        </p>
+                        
+                        <button
+                          onClick={() => {
+                            setShowPaywall(false);
+                            setPaymentSuccess(false);
+                          }}
+                          className="mt-4 px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs rounded-xl cursor-pointer shadow-md uppercase tracking-wider transition font-sans"
+                        >
+                          BẮT ĐẦU TRADING VỚI PRO
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <div className="space-y-4 font-sans">
+                        {/* Header Title */}
+                        <div className="text-center">
+                          <div className="mx-auto w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-1.5">
+                            <Crown className="w-5 h-5 text-amber-400" />
+                          </div>
+                          <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-widest font-sans">
+                            MỞ KHÓA PREMIUM PRO 👑
+                          </h3>
+                          <p className="text-slate-400 text-xs mt-1 font-sans leading-relaxed">
+                            {totalTradesActivated > 20 ? (
+                              <span className="text-amber-400 font-bold">
+                                Bạn đã tích lũy {totalTradesActivated} lượt lưu lệnh (Hạn mức Free: 20).
+                              </span>
+                            ) : (
+                              <span>Hạn mức lưu lệnh tích lũy: {totalTradesActivated}/20.</span>
+                            )}{' '}
+                            Hãy nâng cấp để mở khóa toàn bộ tính năng giám sát vị thế trọn đời.
+                          </p>
+                        </div>
+
+                        {/* AREA 1: BẢNG GIÁ 2 CỘT CHIM MỒI */}
+                        <div className="grid grid-cols-2 gap-3.5 items-stretch">
+                          {/* GÓI THÁNG - VIỀN XÁM MỜ - TỐI GIẢN */}
+                          <div 
+                            onClick={() => setPaywallPlan('monthly')}
+                            className={`p-3.5 rounded-2xl border transition duration-200 cursor-pointer flex flex-col justify-between relative ${
+                              paywallPlan === 'monthly'
+                                ? 'bg-slate-900 border-slate-700 text-white shadow-lg'
+                                : 'bg-slate-950/40 border-slate-850/80 text-slate-400 hover:border-slate-800 hover:bg-slate-900/10'
+                            }`}
+                          >
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-sans">Gói Tháng</div>
+                              <div className="font-mono text-base sm:text-lg font-black text-slate-200 mt-1 font-sans">89.000 VNĐ</div>
+                              <p className="text-[10px] text-slate-400 mt-1 leading-normal font-medium font-sans">Phù hợp trải nghiệm ngắn hạn, gia hạn hàng tháng.</p>
+                            </div>
+                          </div>
+
+                          {/* GÓI NĂM - NỔI BẬT KHUYÊN DÙNG */}
+                          <div 
+                            onClick={() => setPaywallPlan('yearly')}
+                            className={`p-3.5 rounded-2xl border-2 transition duration-200 cursor-pointer flex flex-col justify-between relative ${
+                              paywallPlan === 'yearly'
+                                ? 'bg-[#10131e] border-amber-500 text-white shadow-xl'
+                                : 'bg-slate-950/40 border-slate-850/85 text-slate-400 hover:border-slate-755 hover:bg-slate-900/15'
+                            }`}
+                          >
+                            <span className="absolute -top-2 left-3 px-2 py-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-[8px] font-black uppercase rounded tracking-wider shadow-sm font-sans">
+                              TIẾT KIỆM 22%
+                            </span>
+
+                            <div>
+                              <div className="text-[10px] font-black uppercase tracking-wider text-amber-500 flex items-center gap-1 font-sans">
+                                <Sparkles className="w-3 h-3 text-amber-400 shrink-0 font-sans" />
+                                Gói Năm VIP
+                              </div>
+                              <div className="font-mono text-base sm:text-lg font-black text-amber-400 mt-1 font-sans">828.000 VNĐ</div>
+                              <p className="text-[10px] text-slate-350 leading-none mt-1 font-semibold font-sans">
+                                (chỉ 69.000 VNĐ/ tháng) tiết kiệm ngay 22%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* AREA 1.5: THÔNG TIN THANH TOÁN CHUYỂN KHOẢN VÀ QR CODE */}
+                        <div className="bg-[#10131A] border border-slate-800/80 p-3.5 sm:p-4 rounded-2xl space-y-3 font-sans shadow-lg">
+                          <div className="flex items-center gap-1.5 pb-2 border-b border-slate-850/65">
+                            <CreditCard className="w-4 h-4 text-amber-500" />
+                            <h4 className="text-[11px] font-black text-amber-500 uppercase tracking-wider font-sans">
+                              HƯỚNG DẪN THANH TOÁN CHUYỂN KHOẢN
+                            </h4>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center font-sans">
+                            {/* QR CODE GENERATOR COLUMN - ENLARGED */}
+                            <div className="sm:col-span-5 flex flex-col items-center text-center justify-center font-sans">
+                              <div className="bg-white p-2.5 rounded-2xl shadow-xl w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center select-none border border-slate-800/15 font-sans transform hover:scale-[1.03] transition-transform duration-300">
+                                <img
+                                  referrerPolicy="no-referrer"
+                                  src={`https://img.vietqr.io/image/TCB-19050048400017-qr_only.png?amount=${
+                                    paywallPlan === 'monthly' ? 89000 : 828000
+                                  }&addInfo=${encodeURIComponent(
+                                    `goi ${paywallPlan === 'monthly' ? 'thang' : 'nam'} ${activationEmail.trim() || 'email-cua-ban'}`
+                                  )}&accountName=BE%2520QUANG%2520HUY`}
+                                  alt="VietQR Techcombank Scanner"
+                                  className="w-full h-full object-contain rounded-xl"
+                                />
+                              </div>
+                              <span className="text-[10px] text-amber-500 uppercase tracking-wider font-black mt-3 flex items-center gap-1.5 font-sans">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse font-sans"></span>
+                                QUÉT QR TỰ ĐỘNG SIÊU TỐC
+                              </span>
+                            </div>
+
+                            {/* TEXT INFO & COPYABLE FIELDS COLUMN */}
+                            <div className="sm:col-span-7 space-y-2 text-xs font-sans">
+                              <div className="grid grid-cols-10 gap-1.5 items-center font-sans">
+                                <span className="col-span-3 text-slate-400 font-semibold text-[11px] font-sans">Ngân hàng:</span>
+                                <div className="col-span-7 flex items-center justify-between bg-[#0e111a] px-3 py-1.5 rounded-xl border border-slate-800/80 font-sans">
+                                  <span className="font-bold text-slate-200 text-xs font-sans">Techcombank</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyPaymentInfo('Techcombank', 'bank_name')}
+                                    className="text-slate-400 hover:text-amber-400 p-0.5 transition cursor-pointer font-sans"
+                                  >
+                                    {copiedField === 'bank_name' ? <Check className="w-3.5 h-3.5 text-emerald-400 font-sans" /> : <Copy className="w-3.5 h-3.5 font-sans" />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-10 gap-1.5 items-center font-sans">
+                                <span className="col-span-3 text-slate-400 font-semibold text-[11px] font-sans">Số tài khoản:</span>
+                                <div className="col-span-7 flex items-center justify-between bg-[#0e111a] px-3 py-1.5 rounded-xl border border-slate-800/80 font-mono font-sans">
+                                  <span className="font-black text-white text-xs select-all font-sans">19050048400017</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyPaymentInfo('19050048400017', 'bank_no')}
+                                    className="text-slate-400 hover:text-amber-400 p-0.5 transition cursor-pointer font-sans"
+                                  >
+                                    {copiedField === 'bank_no' ? <Check className="w-3.5 h-3.5 text-emerald-400 font-sans" /> : <Copy className="w-3.5 h-3.5 font-sans" />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-10 gap-1.5 items-center font-sans">
+                                <span className="col-span-3 text-slate-400 font-semibold text-[11px] font-sans">Chủ tài khoản:</span>
+                                <div className="col-span-7 flex items-center justify-between bg-[#0e111a] px-3 py-1.5 rounded-xl border border-slate-800/80 font-sans">
+                                  <span className="font-bold text-slate-100 text-xs font-sans">BE QUANG HUY</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyPaymentInfo('BE QUANG HUY', 'bank_acc')}
+                                    className="text-slate-400 hover:text-amber-400 p-0.5 transition cursor-pointer font-sans"
+                                  >
+                                    {copiedField === 'bank_acc' ? <Check className="w-3.5 h-3.5 text-emerald-400 font-sans" /> : <Copy className="w-3.5 h-3.5 font-sans" />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-10 gap-1.5 items-center font-sans">
+                                <span className="col-span-3 text-slate-400 font-semibold text-[11px] font-sans">Số tiền:</span>
+                                <div className="col-span-7 flex items-center justify-between bg-[#0e111a] px-3 py-1.5 rounded-xl border border-slate-800/80 font-mono font-extrabold text-[#F59E0B] font-sans">
+                                  <span className="text-amber-400 font-black text-xs select-all font-sans">
+                                    {paywallPlan === 'monthly' ? '89.000' : '828.000'} VNĐ
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyPaymentInfo(paywallPlan === 'monthly' ? '89000' : '828000', 'bank_amt')}
+                                    className="text-slate-400 hover:text-amber-400 p-0.5 transition cursor-pointer font-sans"
+                                  >
+                                    {copiedField === 'bank_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400 font-sans" /> : <Copy className="w-3.5 h-3.5 font-sans" />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-[11px] text-slate-350 leading-relaxed bg-amber-500/[0.02] border border-amber-550/10 p-3 rounded-xl font-sans font-medium">
+                            <span className="text-amber-450 font-bold block mb-1 text-xs uppercase tracking-wider">📌 CÚ PHÁP CHUYỂN KHOẢN:</span>
+                            Khách hàng mua gói vui lòng chuyển khoản với nội dung: <span className="text-amber-400 font-extrabold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">gói Tháng hoặc gói Năm + email của bạn</span> (ví dụ: <span className="text-white italic font-bold select-all">goi nam tradervietnam@gmail.com</span>).
+                          </div>
+                        </div>
+
+                        {/* AREA 2: FORM NHẬP MÃ BẮT BUỘC DỄ DÀNG */}
+                        <div className="bg-[#141722]/90 border border-slate-800 p-4 rounded-2xl space-y-4 shadow-inner font-sans">
+                          <h4 className="text-xs font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                            <Crown className="w-4 h-4 text-amber-400 shrink-0 font-sans" />
+                            Kích Hoạt Tài Khoản Premium Pro
+                          </h4>
+
+                          {activationError && (
+                            <div className="p-2.5 bg-red-955/20 border border-red-900/40 text-red-405 text-xs rounded-xl flex items-start gap-1.5 select-text font-sans">
+                              <ShieldAlert className="w-4 h-4 shrink-0 text-red-500 mt-0.5 font-sans" />
+                              <span className="font-semibold leading-normal font-sans">{activationError}</span>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 font-sans">
+                            {/* Ô 1: Email người dùng */}
+                            <div className="space-y-1 font-sans">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Email đăng ký cấp mã:</label>
+                              <input
+                                type="email"
+                                required
+                                placeholder="Nhập địa chỉ Email của bạn..."
+                                value={activationEmail}
+                                onChange={(e) => setActivationEmail(e.target.value)}
+                                className="w-full bg-[#0b0d13] border border-slate-800 text-slate-100 placeholder-slate-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 focus:outline-none text-xs py-2 px-3 rounded-lg transition duration-150 font-sans"
+                              />
+                            </div>
+
+                            {/* Ô 2: License Key */}
+                            <div className="space-y-1 font-sans">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Mã kích hoạt (License Key Pro):</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Nhập License Key Pro (RWP-...)"
+                                value={activationKey}
+                                onChange={(e) => setActivationKey(e.target.value)}
+                                className="w-full bg-[#0b0d13] border border-slate-850 text-slate-100 placeholder-slate-600 font-mono text-xs py-2 px-3 rounded-lg transition duration-150 font-sans"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Nút bấm Kích hoạt */}
+                          <button
+                            type="button"
+                            onClick={handleActivatePro}
+                            disabled={isVerifyingActivation}
+                            className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-black rounded-xl transition duration-150 uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-amber-950/20 shrink-0 cursor-pointer font-sans"
+                          >
+                            {isVerifyingActivation ? (
+                              <>
+                                <span className="w-4 h-4 border-2 border-slate-950 border-t-amber-400 rounded-full animate-spin font-sans"></span>
+                                ĐANG CHỨNG THỰC LICENSE KEY...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 text-slate-950 font-extrabold font-sans" />
+                                KÍCH HOẠT PRO
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
