@@ -23,7 +23,11 @@ import {
   Layers,
   Percent,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  BarChart3,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -49,6 +53,11 @@ interface PortfolioTrackerProps {
   dailyLimitPercent?: number;
   dailyDisciplineLogs: DailyLimitLog[];
   onClearDisciplineLogs?: () => void;
+  isPremium?: boolean;
+  totalTradesActivated?: number;
+  isOfflineTimeHack?: boolean;
+  currentTime?: Date;
+  onTriggerPaywall?: () => void;
 }
 
 export default function PortfolioTracker({
@@ -63,7 +72,12 @@ export default function PortfolioTracker({
   accountBalance,
   dailyLimitPercent,
   dailyDisciplineLogs,
-  onClearDisciplineLogs
+  onClearDisciplineLogs,
+  isPremium = false,
+  totalTradesActivated = 0,
+  isOfflineTimeHack = false,
+  currentTime,
+  onTriggerPaywall
 }: PortfolioTrackerProps) {
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<string>('');
@@ -72,6 +86,10 @@ export default function PortfolioTracker({
   const [isSimulating, setIsSimulating] = useState(false);
   const [showResetLogsModal, setShowResetLogsModal] = useState(false);
   const [resetPhraseInput, setResetPhraseInput] = useState('');
+  const [equityRange, setEquityRange] = useState<'30days' | 'all'>('30days');
+
+  const isLocked = (!isPremium && (totalTradesActivated || 0) > 50) || isOfflineTimeHack;
+  const isProLocked = !isPremium || isOfflineTimeHack;
 
   // Dynamically recalculate dailyLimitLogs based on current accountBalance and dailyLimitPercent
   const mappedDisciplineLogs = useMemo(() => {
@@ -105,7 +123,23 @@ export default function PortfolioTracker({
   });
 
   // Equity Curve data preparation
-  const getEquityData = () => {
+  const getEquityData = (range: '30days' | 'all') => {
+    const isLockedAndLimitActive = (!isPremium && (totalTradesActivated || 0) > 50) || isOfflineTimeHack;
+    const refDate = currentTime || new Date();
+    const limitMs = refDate.getTime() - 30 * 24 * 60 * 60 * 1000;
+    
+    const filterTo30Days = range === '30days';
+    
+    const targetClosedTrades = filterTo30Days
+      ? closedTrades.filter(t => {
+          try {
+            return new Date(t.enteredAt).getTime() >= limitMs;
+          } catch {
+            return false;
+          }
+        })
+      : closedTrades;
+
     const formatTime = (isoString: string) => {
       try {
         const d = new Date(isoString);
@@ -120,7 +154,7 @@ export default function PortfolioTracker({
       }
     };
 
-    if (closedTrades.length === 0) {
+    if (targetClosedTrades.length === 0) {
       return [
         { name: 'Khởi đầu', time: 'Ban đầu', Balance: accountBalance, PnL: 0 },
         { name: 'Hiện tại', time: 'Hiện tại', Balance: accountBalance, PnL: 0 }
@@ -128,7 +162,7 @@ export default function PortfolioTracker({
     }
 
     // Sort closed trades older first (chronologically by enteredAt date)
-    const sortedClosed = [...closedTrades].sort((a, b) => {
+    const sortedClosed = [...targetClosedTrades].sort((a, b) => {
       return new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
     });
 
@@ -161,7 +195,7 @@ export default function PortfolioTracker({
     return dataPoints;
   };
 
-  const equityData = getEquityData();
+  const equityData = getEquityData(equityRange);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -241,7 +275,7 @@ export default function PortfolioTracker({
     }
     
     const roundedLocked = Math.round(lockedPnl * 100) / 100;
-    return sum + (roundedLocked > 0 ? roundedLocked : 0);
+    return sum + roundedLocked;
   }, 0);
 
   // Expected Value (EV) calculation: (WinRate * AvgWin) - (LossRate * AvgLoss)
@@ -264,6 +298,267 @@ export default function PortfolioTracker({
     };
   };
   const ev = getEV();
+
+  const avgRR = useMemo(() => {
+    if (totalClosedCount === 0) return '0.0';
+    const wins = closedTrades.filter(t => t.status === 'won');
+    const losses = closedTrades.filter(t => t.status === 'lost');
+    const avgWin = wins.length > 0 ? wins.reduce((sum, t) => sum + Math.abs(t.pnl), 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? losses.reduce((sum, t) => sum + Math.abs(t.pnl), 0) / losses.length : 0;
+    return avgLoss > 0 ? (avgWin / avgLoss).toFixed(1) : avgWin > 0 ? '∞' : '1.0';
+  }, [closedTrades, totalClosedCount]);
+
+  // Premium Features: Expected Value by Setup Type
+  const setupsEv = useMemo(() => {
+    const groups: { [setupName: string]: { wins: number; losses: number; winAmt: number; lossAmt: number } } = {};
+    
+    closedTrades.forEach(t => {
+      const setupName = t.setup || 'Mặc định';
+      if (!groups[setupName]) {
+        groups[setupName] = { wins: 0, losses: 0, winAmt: 0, lossAmt: 0 };
+      }
+      
+      const pnlValue = t.status === 'won' ? Math.abs(t.pnl) : -Math.abs(t.pnl);
+      if (pnlValue >= 0) {
+        groups[setupName].wins += 1;
+        groups[setupName].winAmt += pnlValue;
+      } else {
+        groups[setupName].losses += 1;
+        groups[setupName].lossAmt += Math.abs(pnlValue);
+      }
+    });
+
+    return Object.keys(groups).map(name => {
+      const g = groups[name];
+      const total = g.wins + g.losses;
+      const winRate = total > 0 ? (g.wins / total) : 0;
+      const lossRate = total > 0 ? (g.losses / total) : 0;
+      const avgWin = g.wins > 0 ? (g.winAmt / g.wins) : 0;
+      const avgLoss = g.losses > 0 ? (g.lossAmt / g.losses) : 0;
+      const evVal = (winRate * avgWin) - (lossRate * avgLoss);
+      return {
+        name,
+        total,
+        winRate: winRate * 100,
+        ev: evVal
+      };
+    }).sort((a, b) => b.ev - a.ev);
+  }, [closedTrades]);
+
+  // Premium Features: Max drawdowns analysis
+  const drawdownStats = useMemo(() => {
+    let balance = accountBalance || 10000;
+    const sortedClosed = [...closedTrades].sort((a, b) => {
+      return new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
+    });
+
+    const balances = [balance];
+    sortedClosed.forEach(t => {
+      const pnlValue = t.status === 'won' ? Math.abs(t.pnl) : -Math.abs(t.pnl);
+      balance += pnlValue;
+      balances.push(balance);
+    });
+
+    let peak = balances[0];
+    let maxDdVal = 0;
+    let maxDdPct = 0;
+    
+    balances.forEach(bal => {
+      if (bal > peak) {
+        peak = bal;
+      }
+      const ddVal = peak - bal;
+      const ddPct = peak > 0 ? (ddVal / peak) * 100 : 0;
+      if (ddVal > maxDdVal) maxDdVal = ddVal;
+      if (ddPct > maxDdPct) maxDdPct = ddPct;
+    });
+
+    const currentBal = balances[balances.length - 1];
+    const currentDdVal = peak - currentBal;
+    const currentDdPct = peak > 0 ? (currentDdVal / peak) * 100 : 0;
+
+    return {
+      maxDdVal: Math.round(maxDdVal * 100) / 100,
+      maxDdPct: Math.round(maxDdPct * 100) / 100,
+      currentDdVal: Math.round(currentDdVal * 100) / 100,
+      currentDdPct: Math.round(currentDdPct * 100) / 100,
+      peak: Math.round(peak * 100) / 100
+    };
+  }, [closedTrades, accountBalance]);
+
+  // Premium Features: Winning/Losing Streak patterns
+  const streakStats = useMemo(() => {
+    const sortedClosed = [...closedTrades].sort((a, b) => {
+      return new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
+    });
+
+    let maxWins = 0;
+    let maxLosses = 0;
+    let currentWins = 0;
+    let currentLosses = 0;
+    let currentStreakType: 'won' | 'lost' | 'none' = 'none';
+    let currentStreakLength = 0;
+
+    sortedClosed.forEach(t => {
+      const isWin = t.status === 'won';
+      if (isWin) {
+        currentWins += 1;
+        maxWins = Math.max(maxWins, currentWins);
+        currentLosses = 0;
+        
+        if (currentStreakType === 'won') {
+          currentStreakLength += 1;
+        } else {
+          currentStreakType = 'won';
+          currentStreakLength = 1;
+        }
+      } else {
+        currentLosses += 1;
+        maxLosses = Math.max(maxLosses, currentLosses);
+        currentWins = 0;
+
+        if (currentStreakType === 'lost') {
+          currentStreakLength += 1;
+        } else {
+          currentStreakType = 'lost';
+          currentStreakLength = 1;
+        }
+      }
+    });
+
+    return {
+      maxWins,
+      maxLosses,
+      currentStreakType,
+      currentStreakLength
+    };
+  }, [closedTrades]);
+
+  // Premium Features: Drawdown distribution segmentation
+  const drawdownDistribution = useMemo(() => {
+    let slight = 0, moderate = 0, heavy = 0;
+    let balance = accountBalance || 10000;
+    let peak = balance;
+    
+    const sortedClosed = [...closedTrades].sort((a, b) => {
+      return new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime();
+    });
+
+    sortedClosed.forEach(t => {
+      const pnlValue = t.status === 'won' ? Math.abs(t.pnl) : -Math.abs(t.pnl);
+      balance += pnlValue;
+      if (balance > peak) {
+        peak = balance;
+      }
+      const ddPct = peak > 0 ? ((peak - balance) / peak) * 100 : 0;
+      if (ddPct > 5) heavy++;
+      else if (ddPct > 2) moderate++;
+      else if (ddPct > 0) slight++;
+    });
+    
+    const total = slight + moderate + heavy || 1;
+    return {
+      slight: Math.round((slight / total) * 100),
+      moderate: Math.round((moderate / total) * 100),
+      heavy: Math.round((heavy / total) * 100),
+      counts: { slight, moderate, heavy }
+    };
+  }, [closedTrades, accountBalance]);
+
+  // Premium Features: Psychological counselor based on streaks
+  const psychAdvisor = useMemo(() => {
+    if (closedTrades.length === 0) {
+      return "Hãy bắt đầu chốt vị thế để kích hoạt cố vấn tâm lý phân tích và tư vấn thói quen kỷ luật.";
+    }
+    
+    const currentStreakLength = streakStats.currentStreakLength;
+    const currentStreakType = streakStats.currentStreakType;
+    
+    if (currentStreakType === 'won' && currentStreakLength >= 3) {
+      return `Bẫy hưng phấn quá độ (Overconfidence Trap). Bạn đang thăng hoa với chuỗi ${currentStreakLength} vị thế WIN liên tiếp. Hãy tuyệt đối kìm nén lòng tham, bám sát bộ quản trị rủi ro, không gia tăng volume tuỳ hứng!`;
+    }
+    
+    if (currentStreakType === 'lost' && currentStreakLength >= 3) {
+      return `Giao dịch trả thù (Revenge Trading). Việc lỗ liên tiếp ${currentStreakLength} lệnh dễ sinh tâm lý cá cú. Hãy đóng màn hình nghỉ ngơi tối thiểu 24 giờ, hoặc hạ 50% khối lượng rủi ro lệnh tiếp theo để thiết lập lại trật tự kỷ luật.`;
+    }
+    
+    if (streakStats.maxLosses >= 5) {
+      return "Cảnh báo chu kỳ rủi ro cao! Lịch sử sụt giảm chuỗi dài tới 5 lệnh hoặc hơn cho thấy chiến lược có thể đang đi ngược pha thị trường hoặc nôn nóng vào vị thế. Hãy chậm lại.";
+    }
+    
+    return "Tâm lý giao dịch ổn định. Quy tắc rủi ro của bạn đang khớp tốt vào thị trường. Tiếp tục bám sát kế hoạch giao dịch và tuân thủ chặt chẽ tỉ lệ R:R ban đầu.";
+  }, [closedTrades, streakStats]);
+
+  // Premium Features: Sharpe Ratio formula
+  const sharpeRatio = useMemo(() => {
+    if (closedTrades.length < 3) return { val: 'N/A', rating: 'Cần ≥ 3 vị thế đóng', color: 'text-slate-500', raw: 0 };
+    const pnls = closedTrades.map(t => t.pnl);
+    const avg = pnls.reduce((sum, val) => sum + val, 0) / pnls.length;
+    const variance = pnls.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / pnls.length;
+    const stdDev = Math.sqrt(variance);
+    const ratio = stdDev > 0 ? avg / stdDev : 0;
+    
+    let rating = 'Yếu';
+    let color = 'text-rose-500';
+    if (ratio >= 2.0) {
+      rating = 'Xuất Sắc 👑';
+      color = 'text-emerald-400';
+    } else if (ratio >= 1.5) {
+      rating = 'Rất Tốt';
+      color = 'text-teal-400';
+    } else if (ratio >= 1.0) {
+      rating = 'Khá Tốt';
+      color = 'text-yellow-400';
+    } else if (ratio > 0) {
+      rating = 'Trung bình';
+      color = 'text-slate-300';
+    }
+    return { 
+      val: ratio.toFixed(2), 
+      rating, 
+      color,
+      raw: ratio
+    };
+  }, [closedTrades]);
+
+  // Premium Features: Download reporters
+  const downloadCSV = () => {
+    if (closedTrades.length === 0) return;
+    const headers = ['ID', 'Ticker', 'Asset Class', 'Direction', 'Lots', 'Units', 'Entry Price', 'Exit Price', 'P&L', 'Time', 'Discipline'];
+    const rows = closedTrades.map(t => [
+      t.id,
+      t.ticker,
+      t.assetClass,
+      t.direction,
+      t.lots || '',
+      t.units,
+      t.entryPrice,
+      t.currentPrice,
+      t.pnl,
+      t.enteredAt,
+      t.uncheckedWarning ? 'Thieu Ky Luat' : 'Dung Ky Luat'
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `RiskWise_Trading_Journal_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadJSON = () => {
+    if (closedTrades.length === 0) return;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(closedTrades, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute("href", dataStr);
+    link.setAttribute("download", `RiskWise_Trading_Journal_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const startEditing = (trade: PortfolioTrade) => {
     setEditingPriceId(trade.id);
@@ -299,7 +594,7 @@ export default function PortfolioTracker({
     <div id="portfolio-tracker-container" className="space-y-6">
       
       {/* Portfolio overview blocks */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Floating Active PnL */}
         <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative">
@@ -329,31 +624,26 @@ export default function PortfolioTracker({
 
         {/* Win Rate */}
         <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative">
-          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tỉ lệ Thắng (Win Rate)</span>
-          <div className="mt-2.5 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black font-mono text-yellow-500 tracking-tight">
-              {winRate.toFixed(1)}%
-            </span>
-            <span className="text-xs text-slate-500 font-mono">({winCount}/{totalClosedCount} lệnh)</span>
+          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tỉ Lệ Thắng / Avg R:R</span>
+          <div className="mt-2.5 flex items-baseline gap-1.5 justify-between">
+            <div>
+              <span className="text-2xl font-black font-mono text-yellow-500 tracking-tight">
+                {winRate.toFixed(1)}%
+              </span>
+              <span className="text-xs text-slate-500 font-mono block">({winCount}/{totalClosedCount} lệnh)</span>
+            </div>
+            <div className="text-right">
+              <span className="text-xl font-black font-mono text-indigo-400 block">{avgRR}</span>
+              <span className="text-[8px] text-slate-500 uppercase tracking-wider font-extrabold block">Avg Win/Loss R:R</span>
+            </div>
           </div>
-          <p className="text-[10px] text-slate-450 mt-1">Kỷ luật càng cao, tỉ lệ thắng càng cải thiện.</p>
-        </div>
-
-        {/* Expected Value (EV) */}
-        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative animate-fadeIn">
-          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Kỳ Vọng Toán Học (EV)</span>
-          <div className="mt-2.5 flex items-baseline gap-1.5">
-            <span className={`text-2xl font-black font-mono tracking-tight ${
-              ev.val > 0 ? 'text-emerald-400' : ev.val < 0 ? 'text-rose-500' : 'text-slate-400'
-            }`}>
-              {ev.formatted}
-            </span>
-          </div>
-          <p className="text-[10px] text-slate-450 mt-1">Lợi nhuận mong đợi trung bình mỗi vị thế.</p>
+          <p className="text-[10px] text-slate-450 mt-1 flex items-center justify-between">
+            <span>Kỷ luật càng cao, tỉ lệ càng cải thiện.</span>
+          </p>
         </div>
 
         {/* Discipline index */}
-        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative animate-fadeIn col-span-2 lg:col-span-1">
+        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative animate-fadeIn">
           <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider font-sans">Kỷ Luật Indicator</span>
           <div className="mt-2.5 flex items-baseline gap-1.5">
             {activeTrades.length === 0 ? (
@@ -383,19 +673,59 @@ export default function PortfolioTracker({
       {/* Visual Analytics Grid: Equity Curve & Sector Risk Allocation */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-6 animate-fadeIn">
         {/* Equity Curve Chart - Spans 8 cols */}
-        <div className="lg:col-span-8 bg-[#14171F] border border-slate-800 rounded-2xl p-5 shadow-xs">
+        <div className="lg:col-span-8 bg-[#14171F] border border-slate-800 rounded-2xl p-5 shadow-xs relative">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 pb-2 border-b border-slate-800/80 gap-3">
             <div>
-              <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+              <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2 flex-wrap">
                 <TrendingUp className="w-4 h-4 text-indigo-400" />
                 Đường Cong Vốn (Equity Curve) &amp; Biến Động Số Dư
+                {((!isPremium && (totalTradesActivated || 0) > 50) || isOfflineTimeHack) && (
+                  <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-500 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider scale-95 origin-left">
+                    Chỉ số 30 ngày (Free Tier)
+                  </span>
+                )}
               </h4>
               <p className="text-[10px] text-slate-500 mt-1 font-sans font-medium">Lịch sử số dư biến động thực tế dựa trên thứ tự chốt lệnh đã thực hiện</p>
             </div>
             
-            <div className="text-left sm:text-right">
-              <span className="text-[9px] block text-slate-500 uppercase tracking-wider font-extrabold font-mono">Tài khoản Quy chiếu</span>
-              <span className="font-mono text-xs font-black text-indigo-455">${accountBalance.toLocaleString('en-US', { minimumFractionDigits: 1 })}</span>
+            <div className="flex items-center gap-3.5 self-start sm:self-auto">
+              {/* Range Toggle */}
+              <div className="flex bg-[#1C212D]/80 rounded-xl p-0.5 border border-slate-800 tracking-wide">
+                <button
+                  type="button"
+                  onClick={() => setEquityRange('30days')}
+                  className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase transition-all tracking-wider cursor-pointer ${
+                    equityRange === '30days'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  30 Ngày (Free)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isProLocked) {
+                      onTriggerPaywall?.();
+                    } else {
+                      setEquityRange('all');
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold uppercase transition-all tracking-wider flex items-center gap-1 cursor-pointer ${
+                    equityRange === 'all' && !isProLocked
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {isProLocked && <Lock className="w-2.5 h-2.5 text-amber-500" />}
+                  Trọn Đời (PRO)
+                </button>
+              </div>
+
+              <div className="text-right hidden sm:block">
+                <span className="text-[9px] block text-slate-500 uppercase tracking-wider font-extrabold font-mono">Tài khoản Quy chiếu</span>
+                <span className="font-mono text-xs font-black text-indigo-455">${accountBalance.toLocaleString('en-US', { minimumFractionDigits: 1 })}</span>
+              </div>
             </div>
           </div>
 
@@ -486,15 +816,274 @@ export default function PortfolioTracker({
             )}
           </div>
           
-          <div className="pt-2.5 border-t border-slate-800/80 mt-4 space-y-1">
-            <div className="flex justify-between text-[10px] text-slate-450 font-bold uppercase">
+          <div className="pt-2.5 border-t border-slate-800/80 mt-4 space-y-1 bg-[#1C212D]/15 p-2 rounded-xl">
+            <div className="flex justify-between text-[10px] text-slate-405 font-bold uppercase">
               <span>Tổng % Risk đang mở:</span>
-              <span className="font-mono text-indigo-400 font-bold text-xs">{accountBalance > 0 ? ((totalActiveRisk / accountBalance) * 100).toFixed(2) : '0.00'}% vốn</span>
+              <span className={`font-mono font-black ${accountBalance > 0 && (totalActiveRisk / accountBalance) * 100 > 10 ? 'text-[#F43F5E]' : 'text-indigo-400'}`}>
+                {(accountBalance > 0 ? (totalActiveRisk / accountBalance) * 100 : 0).toFixed(2)}%
+              </span>
             </div>
-            <div className="flex justify-between text-[10px] text-slate-450 font-bold uppercase">
-              <span>Tổng số tiền risk ở các ngành:</span>
-              <span className="font-mono text-emerald-400 font-bold text-xs">${totalActiveRisk.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+            <div className="flex justify-between text-[8.5px] text-slate-550 font-sans font-semibold">
+              <span>Hạn mức rủi ro tối đa khuyên dùng:</span>
+              <span>10.00% tài khoản</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Phân Tích Hiệu Suất Chuyên Sâu (PRO Performance Grid) */}
+      <div className="space-y-3.5 relative mt-6">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+          <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-emerald-500" />
+            PHÂN TÍCH HIỆU SUẤT CHUYÊN SÂU (PRO METRICS)
+          </h4>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
+          {/* CARD 1: Expected Value (EV) by Setup Type */}
+          <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
+            <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
+              <div>
+                <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider mb-2 text-slate-400">Kỳ Vọng Toán Học EV Setup</span>
+                <div className="flex items-baseline gap-1.5 mb-3 border-b border-slate-800/80 pb-2">
+                  <span className={`text-base font-black font-mono ${ev.val >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                    {ev.formatted}
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-sans">(EV TB Toàn bộ)</span>
+                </div>
+                {setupsEv.length === 0 ? (
+                  <p className="text-[10px] text-slate-500 font-sans italic mt-2">Chưa có dữ liệu setup.</p>
+                ) : (
+                  <div className="space-y-1.5 mt-1 max-h-24 overflow-y-auto scrollbar-none">
+                    {setupsEv.slice(0, 4).map((item) => (
+                      <div key={item.name} className="flex justify-between items-center text-xs font-sans">
+                        <span className="text-slate-300 font-semibold truncate max-w-[125px]">
+                          {item.name} <span className="text-[9px] text-slate-500 font-normal">({item.total} lệnh)</span>
+                        </span>
+                        <span className={`font-mono font-bold ${item.ev >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
+                          {item.ev >= 0 ? '+' : ''}${item.ev.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="text-[9px] text-slate-500 leading-normal border-t border-slate-850 pt-2 font-sans font-medium">
+                Kỳ vọng toán học trung bình của mỗi loại Setup điểm vào. Công thức: (Win% × AvgWin) - (Loss% × AvgLoss).
+              </div>
+            </div>
+
+            {/* Locked Paywall Overlay */}
+            {isProLocked && (
+              <div 
+                onClick={() => onTriggerPaywall?.()}
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-[7px] cursor-pointer text-center group transition duration-300 border border-slate-800/80 rounded-2xl"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center mb-2.5 transition shadow-lg shadow-amber-950/20 group-hover:scale-110">
+                  <Lock className="w-5.5 h-5.5 text-amber-450 shrink-0" />
+                </div>
+                <h4 className="text-[10px] font-black text-amber-450 uppercase tracking-widest mb-1 font-sans">
+                  KỲ VỌNG CHI TIẾT
+                </h4>
+                <p className="text-[9.5px] text-slate-300 max-w-sm leading-snug mb-3.5 font-medium">
+                  Xem chi tiết chỉ số EV của từng thiết lập giao dịch.
+                </p>
+                <span className="text-[8.5px] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-sm group-hover:bg-amber-400 transition font-mono">
+                  PRO ACCESS 👑
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* CARD 2: Sharpe Ratio */}
+          <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
+            <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
+              <div>
+                <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider mb-2 text-slate-400">Chỉ Số Sharpe Ratio</span>
+                <div className="flex items-baseline gap-1.5 mb-2 border-b border-slate-800/80 pb-2">
+                  <span className={`text-xl font-black font-mono tracking-tight ${sharpeRatio.color}`}>
+                    {sharpeRatio.val}
+                  </span>
+                  <span className={`text-[8px] font-bold ${sharpeRatio.color} uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800`}>
+                    {sharpeRatio.rating}
+                  </span>
+                </div>
+                
+                <div className="space-y-1.5 mt-2 text-xs text-slate-300">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-450">Tổng số vị thế đóng:</span>
+                    <span className="font-mono font-semibold text-white">{closedTrades.length} Lệnh</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-450">Hệ số biến động:</span>
+                    <span className="font-mono font-semibold text-indigo-400">Risk-Adjusted</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-[9px] text-slate-500 leading-normal border-t border-slate-850 pt-2 font-sans font-medium">
+                Đo lường tỷ suất lợi nhuận thu hồi trên mỗi phần độ lệch rủi ro chịu đựng. Trị số &gt; 1.0 báo hiệu kỹ năng Pro tối ưu lợi nhuận tốt.
+              </div>
+            </div>
+
+            {/* Locked Paywall Overlay */}
+            {isProLocked && (
+              <div 
+                onClick={() => onTriggerPaywall?.()}
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-[7px] cursor-pointer text-center group transition duration-300 border border-slate-800/80 rounded-2xl"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center mb-2.5 transition shadow-lg shadow-amber-950/20 group-hover:scale-110">
+                  <Lock className="w-5.5 h-5.5 text-amber-455 shrink-0" />
+                </div>
+                <h4 className="text-[10px] font-black text-amber-450 uppercase tracking-widest mb-1 font-sans">
+                  CHỈ SỐ SHARPE RATIO
+                </h4>
+                <p className="text-[9.5px] text-slate-300 max-w-sm leading-snug mb-3.5 font-medium">
+                  Đánh giá phần lợi nhuận so với mức tàn phá của rủi ro.
+                </p>
+                <span className="text-[8.5px] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-sm group-hover:bg-amber-400 transition font-mono">
+                  PRO ACCESS 👑
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* CARD 3: Drawdown Distribution */}
+          <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
+            <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
+              <div>
+                <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider mb-2 text-slate-400">Phân Phối Sụt Giảm (Drawdown)</span>
+                
+                <div className="space-y-1.5 font-sans mb-3 border-b border-slate-800/80 pb-2">
+                  <div className="flex justify-between items-center text-[10.5px]">
+                    <span className="text-slate-400 font-semibold">Max Drawdown (PRO):</span>
+                    <span className="font-mono font-extrabold text-[#F43F5E] text-xs">
+                      -${drawdownStats.maxDdVal.toLocaleString('en-US', { minimumFractionDigits: 1 })} ({drawdownStats.maxDdPct}%)
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10.5px]">
+                    <span className="text-slate-400 font-semibold">Drawdown hiện tại:</span>
+                    <span className="font-mono font-extrabold text-[#F59E0B] text-xs">
+                      -${drawdownStats.currentDdVal.toLocaleString('en-US', { minimumFractionDigits: 1 })} ({drawdownStats.currentDdPct}%)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Distribution Bars */}
+                <div className="space-y-1.5 text-[9px] font-mono">
+                  <div>
+                    <div className="flex justify-between text-slate-400 font-bold mb-0.5">
+                      <span>Nhẹ (0-2%):</span>
+                      <span className="text-emerald-405">{drawdownDistribution.slight}% ({drawdownDistribution.counts.slight} lần)</span>
+                    </div>
+                    <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full" style={{ width: `${drawdownDistribution.slight}%` }} />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-slate-400 font-bold mb-0.5">
+                      <span>Vừa (2-5%):</span>
+                      <span className="text-amber-405">{drawdownDistribution.moderate}% ({drawdownDistribution.counts.moderate} lần)</span>
+                    </div>
+                    <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
+                      <div className="bg-amber-500 h-full" style={{ width: `${drawdownDistribution.moderate}%` }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-slate-400 font-bold mb-0.5">
+                      <span>Lớn (&gt;5%):</span>
+                      <span className="text-rose-405">{drawdownDistribution.heavy}% ({drawdownDistribution.counts.heavy} lần)</span>
+                    </div>
+                    <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
+                      <div className="bg-[#E11D48] h-full" style={{ width: `${drawdownDistribution.heavy}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-[9px] text-slate-500 leading-normal border-t border-slate-850 pt-2 font-sans font-medium">
+                Thống kê số lần tài khoản rơi vào các mức sập gãy sụt giảm sương sương (nhẹ) so với sập nặng (&gt;5%).
+              </div>
+            </div>
+
+            {/* Locked Paywall Overlay */}
+            {isProLocked && (
+              <div 
+                onClick={() => onTriggerPaywall?.()}
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-[7px] cursor-pointer text-center group transition duration-300 border border-slate-800/80 rounded-2xl"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center mb-2.5 transition shadow-lg shadow-amber-950/20 group-hover:scale-110">
+                  <Lock className="w-5.5 h-5.5 text-amber-455 shrink-0" />
+                </div>
+                <h4 className="text-[10px] font-black text-amber-450 uppercase tracking-widest mb-1 font-sans">
+                  PHÂN PHỐI SỤT GIẢM
+                </h4>
+                <p className="text-[9.5px] text-slate-300 max-w-sm leading-snug mb-3.5 font-medium">
+                  Phân tích cấu trúc sụt giảm tài khoản chi tiết để kiểm soát drawdown.
+                </p>
+                <span className="text-[8.5px] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-sm group-hover:bg-amber-400 transition font-mono">
+                  PRO ACCESS 👑
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* CARD 4: Streak Patterns & Counselor */}
+          <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
+            <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
+              <div>
+                <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider mb-2 text-slate-400">Chuỗi Lệnh &amp; Trợ Lý Tâm Lý</span>
+                
+                <div className="space-y-1 text-xs mb-2 bg-[#1C212D]/40 p-2 rounded-xl">
+                  <div className="flex justify-between items-center text-[10.5px]">
+                    <span className="text-slate-400">Chuỗi Thắng Max:</span>
+                    <span className="font-mono font-extrabold text-emerald-400 flex items-center gap-1 shrink-0">
+                      {streakStats.maxWins} Lệnh 🔥
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10.5px]">
+                    <span className="text-slate-400">Chuỗi Thua Max:</span>
+                    <span className="font-mono font-extrabold text-rose-500 shrink-0">
+                      {streakStats.maxLosses} Lệnh ⚠️
+                    </span>
+                  </div>
+                </div>
+
+                {/* Psychology Advice Text */}
+                <div className="text-[9.5px] text-slate-300 font-sans leading-relaxed p-1.5 border-l-2 border-indigo-505 bg-[#1C212D]/25 mt-2 rounded">
+                  <span className="text-indigo-400 font-bold block mb-0.5">Trợ lý Cố Vấn:</span>
+                  "{psychAdvisor}"
+                </div>
+              </div>
+              
+              <div className="text-[9px] text-slate-500 leading-normal border-t border-slate-850 pt-2 font-sans font-medium">
+                Kiểm soát bẫy tâm lý "Overconfidence Trap" khi thắng nhiều, ngăn chặn tuyệt đối trò gồng lỗ phục thù "Revenge trading".
+              </div>
+            </div>
+
+            {/* Locked Paywall Overlay */}
+            {isProLocked && (
+              <div 
+                onClick={() => onTriggerPaywall?.()}
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-[7px] cursor-pointer text-center group transition duration-300 border border-slate-800/80 rounded-2xl"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center mb-2.5 transition shadow-lg shadow-amber-950/20 group-hover:scale-110">
+                  <Lock className="w-5.5 h-5.5 text-amber-455 shrink-0" />
+                </div>
+                <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">
+                  TƯ VẤN ĐỘC QUYỀN
+                </h4>
+                <p className="text-[9.5px] text-slate-300 max-w-sm leading-snug mb-3.5 font-medium">
+                  Cố vấn tâm lý giao dịch tự động phản hổi theo thời gian thực phong độ.
+                </p>
+                <span className="text-[8.5px] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-sm group-hover:bg-amber-400 transition font-mono">
+                  PRO ACCESS 👑
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -808,6 +1397,60 @@ export default function PortfolioTracker({
             </button>
           )}
         </div>
+
+        {closedTrades.length > 0 && (
+          <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4 rounded-xl">
+            <div className={isProLocked ? "blur-[8px] pointer-events-none select-none opacity-30 flex flex-col sm:flex-row sm:items-center justify-between gap-4" : "flex flex-col sm:flex-row sm:items-center justify-between gap-4"}>
+              <div className="space-y-1">
+                <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                  XUẤT BÁO CÁO NHẬT KÝ CHI TIẾT
+                </h4>
+                <p className="text-[10.5px] text-slate-500 font-sans font-semibold">Xuất dữ liệu lịch sử lệnh giao dịch đã chốt của bạn ra các định dạng chuẩn để lưu trữ hoặc phân tích sâu hoặc gộp lên trang web phân tích khác.</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={downloadCSV}
+                  className="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Xuất Excel / CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadJSON}
+                  className="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Xuất file JSON
+                </button>
+              </div>
+            </div>
+
+            {isProLocked && (
+              <div 
+                onClick={() => onTriggerPaywall?.()}
+                className="absolute inset-0 z-10 flex flex-col sm:flex-row items-center justify-center p-4 bg-slate-950/85 backdrop-blur-[7px] cursor-pointer text-center sm:text-left gap-4 group transition duration-300 border border-slate-800/80 rounded-xl"
+              >
+                <div className="w-11 h-11 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 transition shadow-lg group-hover:scale-110">
+                  <Lock className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h4 className="text-[11px] font-black text-amber-400 uppercase tracking-widest mb-0.5">
+                    XUẤT BÁO CÁO GIAO DỊCH (PRO)
+                  </h4>
+                  <p className="text-[10px] text-slate-350 max-w-sm leading-relaxed font-sans font-semibold">
+                    Tính năng xuất dữ liệu ra file Excel/CSV, JSON chỉ dành riêng cho thành viên đăng ký gói PREMIUM VIP.
+                  </p>
+                </div>
+                <span className="sm:ml-auto text-[9px] bg-amber-500 text-slate-950 font-black px-3 py-1.5 rounded-lg uppercase tracking-wider shadow-sm group-hover:bg-amber-400 transition">
+                  NÂNG CẤP PRO 👑
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {closedTrades.length === 0 ? (
           <div className="text-center py-8 border border-dashed border-slate-800 rounded-2xl bg-[#14171F]/15">

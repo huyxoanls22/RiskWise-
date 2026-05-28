@@ -70,6 +70,7 @@ export interface PortfolioTrade {
   isPriceUpdated?: boolean; // whether current price has been explicitly updated by user
   notes?: string;
   sector?: string;
+  setup?: string;
 }
 
 export interface TradingPlan {

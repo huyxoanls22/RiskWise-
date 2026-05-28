@@ -678,12 +678,6 @@ export default function App() {
   };
 
   const handleAttemptLogTrade = () => {
-    // Local Freemium Lifetime limit protection (Max 20 saved trades)
-    if (!isPremium && totalTradesActivated > 20) {
-      setShowPaywall(true);
-      return;
-    }
-
     const todayDateStr = getLocalTodayDateStr();
 
     // Sum up risk for all entries logged today in active and closed trades
@@ -855,7 +849,8 @@ export default function App() {
 
     // Tính toán "lợi nhuận thực tế" (Locked PnL via Trailing Stop) tương ứng với cột Lợi Nhuận Thực Tế
     let roundedLocked = 0;
-    if (trade.trailingStopPrice !== undefined && trade.trailingStopPrice !== null) {
+    const hasActualProfit = trade.trailingStopPrice !== undefined && trade.trailingStopPrice !== null;
+    if (hasActualProfit) {
       let lockedPnl = 0;
       const isLong = trade.direction === 'long';
       if (trade.assetClass === 'forex') {
@@ -879,10 +874,10 @@ export default function App() {
     let correctedPnl: number;
     let finalOutcome: 'won' | 'lost' = outcome;
 
-    if (roundedLocked > 0) {
-      // Nếu cột "lợi nhuận thực tế" có giá trị (> 0), lấy theo cột đó
+    if (hasActualProfit) {
+      // Nếu cột "lợi nhuận thực tế" có giá trị, lấy theo cột đó
       correctedPnl = roundedLocked;
-      finalOutcome = 'won';
+      finalOutcome = correctedPnl >= 0 ? 'won' : 'lost';
     } else {
       // Nếu không, lấy theo cột "lợi nhuận (PNL)" bên cạnh (trade.pnl)
       correctedPnl = trade.pnl;
@@ -1206,11 +1201,6 @@ export default function App() {
           
           <button
             onClick={() => {
-              if (!isPremium && totalTradesActivated > 20) {
-                setShowPaywall(true);
-              } else if (isOfflineTimeHack) {
-                setShowPaywall(true);
-              }
               setActiveTab('portfolio');
             }}
             className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
@@ -1230,11 +1220,6 @@ export default function App() {
 
           <button
             onClick={() => {
-              if (!isPremium && totalTradesActivated > 20) {
-                setShowPaywall(true);
-              } else if (isOfflineTimeHack) {
-                setShowPaywall(true);
-              }
               setActiveTab('plans');
             }}
             className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
@@ -1697,7 +1682,7 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               className="pb-12 relative min-h-[400px]"
             >
-              <div className={(!isPremium && totalTradesActivated > 20) || isOfflineTimeHack ? "blur-md pointer-events-none select-none opacity-45 transition-all duration-300" : ""}>
+              <div>
                 <PortfolioTracker
                   activeTrades={activeTrades}
                   closedTrades={closedTrades}
@@ -1713,30 +1698,13 @@ export default function App() {
                   onClearDisciplineLogs={() => {
                     setDailyDisciplineLogs([]);
                   }}
+                  isPremium={isPremium}
+                  totalTradesActivated={totalTradesActivated}
+                  isOfflineTimeHack={isOfflineTimeHack}
+                  currentTime={currentTime}
+                  onTriggerPaywall={() => setShowPaywall(true)}
                 />
               </div>
-
-              {((!isPremium && totalTradesActivated > 20) || isOfflineTimeHack) && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-[#0B0D13]/70 rounded-2xl text-center border border-amber-500/25 backdrop-blur-xs min-h-[300px] shadow-2xl">
-                  <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-4">
-                    <Crown className="w-7 h-7 text-amber-400" />
-                  </div>
-                  <h3 className="text-sm font-black text-amber-400 uppercase tracking-widest mb-1.5">
-                    {isOfflineTimeHack ? "PHÁT HIỆN SAI LỆCH THỜI GIAN" : "HẠN MỨC FREE ĐÃ HẾT"}
-                  </h3>
-                  <p className="text-xs text-slate-300 max-w-sm leading-relaxed mb-5 font-sans font-medium">
-                    {isOfflineTimeHack 
-                      ? "Phát hiện lùi thời gian thiết bị so với mốc thời gian thực tế đã ghi nhận trước đó. Vui lòng kết nối Internet để kiểm tra."
-                      : "Bạn đã dùng hết hạn mức 20 lệnh lưu miễn phí trọn đời. Vui lòng nâng cấp Premium VIP để theo dõi danh mục vị thế đang mở không giới hạn."}
-                  </p>
-                  <button
-                    onClick={() => setShowPaywall(true)}
-                    className="px-6 py-2.5 bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider select-none shrink-0 cursor-pointer shadow-md shadow-amber-950/20"
-                  >
-                    NÂNG CẤP PREMIUM VIP
-                  </button>
-                </div>
-              )}
             </motion.div>
           )}
 
@@ -1748,7 +1716,7 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               className="pb-12 relative min-h-[400px]"
             >
-              <div className={(!isPremium && totalTradesActivated > 20) || isOfflineTimeHack ? "blur-md pointer-events-none select-none opacity-45 transition-all duration-300" : ""}>
+              <div>
                 <TradingPlanManager
                   plans={plans}
                   onAddPlan={handleAddPlan}
@@ -1757,28 +1725,6 @@ export default function App() {
                   onImportPlanToCalc={handleImportPlanToCalc}
                 />
               </div>
-
-              {((!isPremium && totalTradesActivated > 20) || isOfflineTimeHack) && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-[#0B0D13]/70 rounded-2xl text-center border border-amber-500/25 backdrop-blur-xs min-h-[300px] shadow-2xl">
-                  <div className="mx-auto w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center mb-4">
-                    <Crown className="w-7 h-7 text-amber-400" />
-                  </div>
-                  <h3 className="text-sm font-black text-amber-400 uppercase tracking-widest mb-1.5">
-                    {isOfflineTimeHack ? "PHÁT HIỆN SAI LỆCH THỜI GIAN" : "HẠN MỨC FREE ĐÃ HẾT"}
-                  </h3>
-                  <p className="text-xs text-slate-300 max-w-sm leading-relaxed mb-5 font-sans font-medium">
-                    {isOfflineTimeHack 
-                      ? "Phát hiện lùi thời gian thiết bị so với mốc thời gian thực tế đã ghi nhận trước đó. Vui lòng kết nối Internet để kiểm tra."
-                      : "Bạn đã dùng hết hạn mức 20 lệnh lưu miễn phí trọn đời. Vui lòng nâng cấp Premium VIP để theo dõi kế hoạch khớp lệnh kỷ luật."}
-                  </p>
-                  <button
-                    onClick={() => setShowPaywall(true)}
-                    className="px-6 py-2.5 bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider select-none shrink-0 cursor-pointer shadow-md shadow-amber-950/20"
-                  >
-                    NÂNG CẤP PREMIUM VIP
-                  </button>
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -2064,12 +2010,12 @@ export default function App() {
                             MỞ KHÓA PREMIUM PRO 👑
                           </h3>
                           <p className="text-slate-400 text-xs mt-1 font-sans leading-relaxed">
-                            {totalTradesActivated > 20 ? (
+                            {totalTradesActivated > 50 ? (
                               <span className="text-amber-400 font-bold">
-                                Bạn đã tích lũy {totalTradesActivated} lượt lưu lệnh (Hạn mức Free: 20).
+                                Bạn đã tích lũy {totalTradesActivated} lượt lưu lệnh (Hạn mức Free: 50).
                               </span>
                             ) : (
-                              <span>Hạn mức lưu lệnh tích lũy: {totalTradesActivated}/20.</span>
+                              <span>Hạn mức lưu lệnh tích lũy: {totalTradesActivated}/50.</span>
                             )}{' '}
                             Hãy nâng cấp để mở khóa toàn bộ tính năng giám sát vị thế trọn đời.
                           </p>
