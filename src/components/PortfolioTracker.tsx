@@ -1721,31 +1721,31 @@ export default function PortfolioTracker({
               initial={{ scale: 0.94, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.94, opacity: 0 }}
-              className="bg-[#14171F] border border-red-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden text-center"
+              className="bg-[#14171F] border border-red-500/40 rounded-2xl p-6 sm:p-7 max-w-md sm:max-w-[490px] w-full shadow-2xl relative overflow-hidden text-center"
             >
               <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
-              <div className="mx-auto w-12 h-12 rounded-xl bg-red-955 border border-red-900/30 text-rose-400 flex items-center justify-center mb-4">
+              <div className="mx-auto w-12 h-12 rounded-xl bg-red-955/45 border border-red-900/30 text-rose-400 flex items-center justify-center mb-4">
                 <AlertCircle className="w-6 h-6 animate-pulse" />
               </div>
 
-              <h3 className="text-red-400 font-extrabold text-sm uppercase tracking-widest font-sans flex items-center justify-center gap-1.5 animate-pulse">
+              <h3 className="text-red-450 font-black text-base sm:text-lg uppercase tracking-widest font-sans flex items-center justify-center gap-1.5 animate-pulse">
                 Xác nhận khôi phục
               </h3>
               
-              <p className="text-sm text-slate-100 font-extrabold font-sans mt-3">
+              <p className="text-xs sm:text-sm text-slate-100 font-extrabold font-sans mt-2">
                 Bạn có thật sự muốn bỏ Daily Limit không?
               </p>
 
-              <div className="mt-4 p-3 bg-[#1C212D]/85 border border-red-900/30 rounded-xl text-left text-xs leading-relaxed text-slate-400">
+              <div className="mt-4 p-4 bg-[#1C212D]/85 border border-red-900/30 rounded-xl text-left text-xs sm:text-[13px] leading-relaxed text-slate-300 font-semibold">
                 Toàn bộ dữ liệu lịch sử tuân thủ, điểm số kỷ luật, và hành trình rèn luyện rủi ro ngày của bạn sẽ bị xoá sạch vĩnh viễn và không thể khôi phục lại.
               </div>
 
-              <div className="mt-4 space-y-3">
-                <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
+              <div className="mt-4 space-y-2.5">
+                <p className="text-xs text-slate-350 font-sans font-semibold leading-relaxed">
                   Để xác minh việc này, bạn bắt buộc phải gõ chính xác dòng chữ dưới đây:
                 </p>
-                <div className="bg-[#1C212D] px-3 py-2 text-[11px] font-mono text-[#F43F5E] select-none font-black tracking-wide border border-red-950/50 rounded-lg">
+                <div className="bg-[#1C212D] px-3.5 py-2.5 text-xs font-mono text-[#F43F5E] select-none font-black tracking-widest border border-red-950/50 rounded-xl text-center">
                   Tôi chấp nhận làm lại từ đầu
                 </div>
                 <input
@@ -1753,16 +1753,16 @@ export default function PortfolioTracker({
                   placeholder="Gõ chính xác dòng chữ trên tại đây..."
                   value={resetPhraseInput}
                   onChange={(e) => setResetPhraseInput(e.target.value)}
-                  className="w-full bg-[#1C212D]/95 border border-slate-750 text-slate-205 placeholder-slate-600 focus:border-red-500 focus:outline-hidden font-sans text-xs text-center py-2.5 px-3 rounded-xl transition duration-150"
+                  className="w-full bg-[#1C212D]/95 border border-slate-705 text-slate-100 placeholder-slate-500 focus:border-red-500 focus:outline-[#EF4444]/20 font-sans text-xs sm:text-sm font-semibold text-center py-2.5 px-3.5 rounded-xl transition duration-150"
                   autoFocus
                 />
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3.5">
                 <button
                   type="button"
                   onClick={() => setShowResetLogsModal(false)}
-                  className="py-2.5 px-4 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-black rounded-xl cursor-pointer transition duration-150 uppercase tracking-wider"
+                  className="py-2.5 px-4 bg-[#1e2330] hover:bg-slate-700 text-slate-300 hover:text-slate-100 text-xs font-black rounded-xl cursor-pointer transition duration-150 uppercase tracking-wider"
                 >
                   Hủy bỏ
                 </button>
@@ -1778,7 +1778,7 @@ export default function PortfolioTracker({
                   }}
                   className={`py-2.5 px-4 border text-xs font-black rounded-xl transition duration-150 uppercase tracking-wider select-none ${
                     resetPhraseInput === "Tôi chấp nhận làm lại từ đầu"
-                      ? "bg-red-950/30 hover:bg-red-900/60 border-red-800 text-red-350 cursor-pointer shadow-lg shadow-red-950/20"
+                      ? "bg-red-950/30 hover:bg-red-900/60 border-red-800 text-red-300 cursor-pointer shadow-lg shadow-red-950/20"
                       : "bg-[#14171F] border-slate-800 text-slate-600 cursor-not-allowed"
                   }`}
                 >

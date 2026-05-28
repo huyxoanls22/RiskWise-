@@ -43,9 +43,9 @@ import { motion, AnimatePresence } from 'motion/react';
 
 // Affiliate Links configurations for customization
 const AFFILIATE_LINKS = { 
-  binance: 'https://accounts.binance.com/register?ref=YOUR_ID', 
-  bybit: 'https://www.bybit.com/register?affiliate_id=YOUR_ID', 
-  okx: 'https://www.okx.com/join/YOUR_ID' 
+  binance: 'https://www.binance.com/register?ref=873133600', 
+  exness: 'https://one.exnessonelink.com/a/r9pl2ziwvt', 
+  the5ers: 'https://www.the5ers.com/?afmc=1bko' 
 };
 
 // Default initial state
@@ -1113,26 +1113,26 @@ export default function App() {
                         <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                       </a>
                       <a
-                        href={AFFILIATE_LINKS.bybit}
+                        href={AFFILIATE_LINKS.exness}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-between p-2 rounded-xl hover:bg-[#1C212D] text-slate-250 transition font-medium"
                       >
                         <div className="flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                          <span>Bybit Exchange</span>
+                          <span>Exness Global</span>
                         </div>
                         <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                       </a>
                       <a
-                        href={AFFILIATE_LINKS.okx}
+                        href={AFFILIATE_LINKS.the5ers}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-between p-2 rounded-xl hover:bg-[#1C212D] text-slate-250 transition font-medium"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
-                          <span>OKX Exchange</span>
+                          <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                          <span>The5ers Prop Firm</span>
                         </div>
                         <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                       </a>
@@ -1652,20 +1652,20 @@ export default function App() {
                         Binance <ExternalLink className="w-3 h-3" />
                       </a>
                       <a 
-                        href={AFFILIATE_LINKS.bybit} 
+                        href={AFFILIATE_LINKS.exness} 
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="text-amber-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
                       >
-                        Bybit <ExternalLink className="w-3 h-3" />
+                        Exness <ExternalLink className="w-3 h-3" />
                       </a>
                       <a 
-                        href={AFFILIATE_LINKS.okx} 
+                        href={AFFILIATE_LINKS.the5ers} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="text-cyan-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                        className="text-sky-400 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
                       >
-                        OKX <ExternalLink className="w-3 h-3" />
+                        The5ers <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
                   </div>
@@ -1738,49 +1738,49 @@ export default function App() {
               initial={{ scale: 0.94, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.94, opacity: 0 }}
-              className="bg-[#14171F] border border-red-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden text-center"
+              className="bg-[#14171F] border border-red-500/40 rounded-2xl p-6 sm:p-7 max-w-md sm:max-w-[490px] w-full shadow-2xl relative overflow-hidden text-center"
             >
               <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
-              <div className="mx-auto w-12 h-12 rounded-xl bg-red-950/40 border border-red-900/40 text-red-400 flex items-center justify-center mb-4">
+              <div className="mx-auto w-12 h-12 rounded-xl bg-red-955/45 border border-red-900/40 text-red-400 flex items-center justify-center mb-4 shadow-md">
                 <ShieldAlert className="w-6 h-6 animate-pulse" />
               </div>
 
-              <h3 className="text-red-400 font-black text-sm uppercase tracking-widest font-sans flex items-center justify-center gap-1.5">
+              <h3 className="text-red-400 font-black text-base sm:text-lg uppercase tracking-widest font-sans flex items-center justify-center gap-1.5">
                 Cảnh Báo: Chạm Giới Hạn Rủi Ro!
               </h3>
               
-              <p className="text-xs text-rose-300/80 font-bold font-sans mt-1">
+              <p className="text-xs sm:text-sm text-rose-300 font-bold font-sans mt-1">
                 Giao dịch này vượt Giới hạn Rủi ro hàng ngày của bạn!
               </p>
 
-              <div className="mt-4 p-4 bg-[#1C212D]/80 border border-red-900/35 rounded-xl text-left space-y-2.5 text-xs">
-                <div className="flex justify-between items-center text-slate-400 font-medium">
+              <div className="mt-4 p-4 bg-[#1C212D]/85 border border-red-900/35 rounded-xl text-left space-y-2.5 text-xs sm:text-[13px]">
+                <div className="flex justify-between items-center text-slate-300 font-semibold gap-2">
                   <span>Giới hạn rủi ro Ngày ({setup.dailyLimitPercent}%):</span>
-                  <span className="font-mono text-white font-bold">${dailyLimitWarningData.allowedLimitUSD.toLocaleString('en-US', { maximumFractionDigits: 1 })}</span>
+                  <span className="font-mono text-white text-xs sm:text-sm font-extrabold">${dailyLimitWarningData.allowedLimitUSD.toLocaleString('en-US', { maximumFractionDigits: 1 })}</span>
                 </div>
-                <div className="flex justify-between items-center text-slate-400 font-medium">
+                <div className="flex justify-between items-center text-slate-300 font-semibold gap-2">
                   <span>Rủi ro đã tích lũy hôm nay:</span>
-                  <span className="font-mono text-slate-205">${dailyLimitWarningData.todayRiskRisk.toLocaleString('en-US', { maximumFractionDigits: 1 })}</span>
+                  <span className="font-mono text-slate-205 text-xs sm:text-sm font-extrabold">${dailyLimitWarningData.todayRiskRisk.toLocaleString('en-US', { maximumFractionDigits: 1 })}</span>
                 </div>
-                <div className="flex justify-between items-center text-slate-400 font-medium">
+                <div className="flex justify-between items-center text-slate-300 font-semibold gap-2">
                   <span>Rủi ro vị thế chuẩn bị vào:</span>
-                  <span className="font-mono text-red-400 font-bold">+${dailyLimitWarningData.newTradeRisk.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono text-red-400 text-xs sm:text-sm font-extrabold">+${dailyLimitWarningData.newTradeRisk.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
                 </div>
-                <div className="pt-2 border-t border-slate-800 flex justify-between items-center font-bold text-[13px]">
-                  <span className="text-slate-300">Tổng rủi ro dự kiến:</span>
+                <div className="pt-2.5 border-t border-slate-750 flex justify-between items-center font-black text-sm sm:text-base">
+                  <span className="text-slate-200">Tổng rủi ro dự kiến:</span>
                   <span className="font-mono text-red-500">${(dailyLimitWarningData.todayRiskRisk + dailyLimitWarningData.newTradeRisk).toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
                 </div>
-                <div className="text-[10px] text-red-450/90 font-medium leading-relaxed italic text-center pt-1 block">
+                <div className="text-[11px] sm:text-[11.5px] text-red-400/95 font-semibold leading-relaxed italic text-center pt-1 block">
                   *(Hệ thống đã nhận diện mức vượt hạn mức rủi ro tối đa cố định: vượt quá ${(dailyLimitWarningData.todayRiskRisk + dailyLimitWarningData.newTradeRisk - dailyLimitWarningData.allowedLimitUSD).toLocaleString('en-US', { maximumFractionDigits: 1 })} USD)
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
-                <p className="text-[11px] text-slate-400 font-sans leading-relaxed">
+              <div className="mt-4 space-y-2.5">
+                <p className="text-xs text-slate-300 font-sans font-medium leading-relaxed">
                   Để ghi đè và lưu vị thế vi phạm này, bạn bắt buộc phải gõ tay chính xác cụm từ sau để nhận thức việc phá vỡ kỷ luật:
                 </p>
-                <div className="bg-[#1C212D] px-3 py-2 text-[11px] font-mono text-[#F43F5E] select-none font-black tracking-wide border border-red-950/50 rounded-lg">
+                <div className="bg-[#1C212D] px-3.5 py-2.5 text-xs font-mono text-[#F43F5E] select-none font-black tracking-widest border border-red-900/60 rounded-xl text-center">
                   Tôi chấp nhận phá vỡ kỷ luật
                 </div>
                 <input
@@ -1788,12 +1788,13 @@ export default function App() {
                   placeholder="Gõ chính xác dòng chữ trên tại đây..."
                   value={forcePhraseInput}
                   onChange={(e) => setForcePhraseInput(e.target.value)}
-                  className="w-full bg-[#1C212D]/90 border border-slate-750 text-slate-205 placeholder-slate-600 focus:border-red-500 focus:outline-hidden font-sans text-xs text-center py-2.5 px-3 rounded-xl transition duration-150"
+                  className="w-full bg-[#1C212D]/95 border border-slate-705 text-slate-100 placeholder-slate-500 focus:border-red-500 focus:outline-[#EF4444]/20 font-sans text-xs sm:text-sm font-semibold text-center py-2.5 px-3.5 rounded-xl transition duration-150"
                 />
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3.5">
                 <button
+                  type="button"
                   onClick={() => setShowDailyLimitModal(false)}
                   className="py-2.5 px-4 bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/60 border border-emerald-850/60 text-xs font-black rounded-xl cursor-pointer transition duration-150 uppercase tracking-wider"
                 >
@@ -1828,47 +1829,51 @@ export default function App() {
               initial={{ scale: 0.92, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.92, opacity: 0 }}
-              className="bg-[#14171F] border border-rose-900/50 rounded-2xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden text-center"
+              className="bg-[#14171F] border border-rose-900/50 rounded-2xl p-6 sm:p-7 max-w-md sm:max-w-[490px] w-full shadow-2xl relative overflow-hidden text-center"
             >
               <div className="absolute right-0 top-0 w-24 h-24 bg-rose-500/10 rounded-full blur-xl pointer-events-none"></div>
 
-              <div className="mx-auto w-12 h-12 rounded-xl bg-rose-950/40 border border-rose-900/40 text-rose-400 flex items-center justify-center mb-4">
-                <ShieldAlert className="w-6 h-6" />
+              <div className="mx-auto w-12 h-12 rounded-xl bg-rose-955/45 border border-rose-900/40 text-rose-400 flex items-center justify-center mb-4 shadow-md">
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
               </div>
 
-              <h3 className="text-slate-100 font-bold text-base uppercase tracking-wider font-sans">
+              <h3 className="text-slate-100 font-extrabold text-base sm:text-lg uppercase tracking-widest font-sans">
                 Cảnh báo Quy tắc Kỷ luật!
               </h3>
               
-              <div className="mt-3.5 space-y-2.5 text-xs text-slate-400 font-sans leading-relaxed">
-                <p>
-                  Bạn chưa tích chọn đầy đủ các tiêu chí <span className="text-rose-400 font-bold uppercase">Bắt buộc</span> trong Checklist giao dịch trước khi vào lệnh.
+              <div className="mt-4 space-y-3.5 text-xs text-slate-300 font-sans leading-relaxed">
+                <p className="font-semibold text-slate-200">
+                  Bạn chưa tích chọn đầy đủ các tiêu chí <span className="text-rose-400 font-black uppercase">Bắt buộc</span> trong Checklist giao dịch trước khi vào lệnh.
                 </p>
-                <div className="p-3 bg-[#1C212D]/60 border border-rose-950 rounded-xl text-left text-[11px] font-medium text-rose-300 font-sans">
-                  <span className="font-bold block text-rose-400 mb-1">Các tiêu chí bị bỏ qua gồm:</span>
-                  <ul className="list-disc leading-relaxed pl-4 space-y-1">
-                    {checklist.filter(item => item.isRequired && !item.isChecked).map(item => (
-                      <li key={item.id}>{item.text}</li>
-                    ))}
-                  </ul>
+                
+                <div className="p-3.5 sm:p-4 bg-[#1C212D]/80 border border-rose-900/40 rounded-xl text-left text-xs font-semibold text-rose-350 font-sans">
+                  <span className="font-extrabold block text-rose-400 text-xs sm:text-[13px] mb-2 border-b border-rose-950/40 pb-1.5">Các tiêu chí bị bỏ qua gồm:</span>
+                  <div className="max-h-24 overflow-y-auto pr-1 select-text scrollbar-thin" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(244,63,94,0.3) transparent' }}>
+                    <ul className="list-disc leading-relaxed pl-4.5 space-y-1.5 text-rose-300">
+                      {checklist.filter(item => item.isRequired && !item.isChecked).map(item => (
+                        <li key={item.id} className="text-rose-250/90 font-medium">{item.text}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                <p className="text-[11px] italic text-slate-500">
+
+                <p className="text-[11px] sm:text-xs italic text-slate-400 font-medium leading-relaxed">
                   ⚠️ Việc vào lệnh thiếu điều kiện là nguyên nhân cốt lõi gây sụt giảm tài khoản đáng tiếc.
                 </p>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3.5">
                 <button
                   type="button"
                   onClick={() => setShowWarningModal(false)}
-                  className="py-2.5 px-4 bg-[#1e2330] hover:bg-slate-700 text-slate-350 text-xs font-bold rounded-xl cursor-pointer transition duration-150 font-sans"
+                  className="py-2.5 px-4 bg-[#1e2330] hover:bg-slate-700 text-slate-200 text-xs font-black rounded-xl cursor-pointer transition duration-150 uppercase tracking-wider font-sans"
                 >
                   Quay lại Checklist
                 </button>
                 <button
                   type="button"
                   onClick={() => executeAndLogTrade(true)} // force pass, marked as unchecked warning
-                  className="py-2.5 px-4 bg-rose-950/50 hover:bg-rose-900/40 text-rose-300 border border-rose-900/30 text-xs font-bold rounded-xl cursor-pointer transition duration-150 font-sans"
+                  className="py-2.5 px-4 bg-rose-950/50 hover:bg-rose-900/40 text-rose-300 border border-rose-900/30 text-xs font-black rounded-xl cursor-pointer transition duration-150 uppercase tracking-wider font-sans"
                 >
                   Vẫn giao dịch
                 </button>
