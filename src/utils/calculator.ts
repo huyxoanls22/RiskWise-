@@ -1,17 +1,54 @@
 import { ForexPairConfig, TradeSetup, CalculationResult } from '../types';
 
 export const FOREX_PAIRS: ForexPairConfig[] = [
+  // Major Pairs (USD Quotes, EUR, GBP, AUD, NZD)
   { symbol: 'EUR/USD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 10 },
   { symbol: 'GBP/USD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 10 },
   { symbol: 'AUD/USD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 10 },
   { symbol: 'NZD/USD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 10 },
-  { symbol: 'USD/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 }, // dynamic approximation
+  
+  // Majors (USD Base, Quote Japanese Yen, Canadian Dollar, Swiss Franc)
+  { symbol: 'USD/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 },
   { symbol: 'USD/CAD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 7.4 },
   { symbol: 'USD/CHF', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 11.2 },
+
+  // Euro Crosses
   { symbol: 'EUR/GBP', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 12.5 },
   { symbol: 'EUR/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 },
+  { symbol: 'EUR/AUD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 6.8 },
+  { symbol: 'EUR/CAD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 7.4 },
+  { symbol: 'EUR/CHF', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 11.2 },
+  { symbol: 'EUR/NZD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 6.2 },
+
+  // Pound Crosses
   { symbol: 'GBP/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 },
-  { symbol: 'BTC/USD (Crypto Lot)', pipSize: 1, standardLotUnits: 1, defaultPipValueUSD: 1 },
+  { symbol: 'GBP/AUD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 6.8 },
+  { symbol: 'GBP/CAD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 7.4 },
+  { symbol: 'GBP/CHF', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 11.2 },
+  { symbol: 'GBP/NZD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 6.2 },
+
+  // Aussie & Kiwi & Swiss Franc & Canadian crosses
+  { symbol: 'AUD/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 },
+  { symbol: 'AUD/CAD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 7.4 },
+  { symbol: 'AUD/CHF', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 11.2 },
+  { symbol: 'AUD/NZD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 6.2 },
+  { symbol: 'NZD/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 },
+  { symbol: 'NZD/CAD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 7.4 },
+  { symbol: 'NZD/CHF', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 11.2 },
+  { symbol: 'CAD/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 },
+  { symbol: 'CAD/CHF', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 11.2 },
+  { symbol: 'CHF/JPY', pipSize: 0.01, standardLotUnits: 100000, defaultPipValueUSD: 9.3 },
+
+  // Emerging & Exotics
+  { symbol: 'USD/SGD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 7.4 },
+  { symbol: 'USD/HKD', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 1.28 },
+  { symbol: 'USD/MXN', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 0.55 },
+  { symbol: 'USD/ZAR', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 0.52 },
+  { symbol: 'USD/TRY', pipSize: 0.0001, standardLotUnits: 100000, defaultPipValueUSD: 0.03 },
+
+  // Metals & Popular Commodities (treated under Forex lot rules)
+  { symbol: 'XAU/USD (Gold)', pipSize: 0.01, standardLotUnits: 100, defaultPipValueUSD: 1.0 },
+  { symbol: 'XAG/USD (Silver)', pipSize: 0.01, standardLotUnits: 5000, defaultPipValueUSD: 50.0 },
 ];
 
 export function calculatePositionSize(setup: TradeSetup): CalculationResult {

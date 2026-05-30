@@ -521,6 +521,81 @@ export default function PortfolioTracker({
     };
   }, [closedTrades]);
 
+  // Premium Features: Profit Factor formula & rating
+  const profitFactor = useMemo(() => {
+    if (closedTrades.length === 0) {
+      return {
+        val: 'N/A',
+        rating: 'Chưa có vị thế đóng 📊',
+        color: 'text-slate-500',
+        totalGrossProfit: 0,
+        totalGrossLoss: 0,
+        advice: "Chưa có đủ số liệu giao dịch đã đóng để tính toán Profit Factor. Hãy bắt đầu chốt vị thế để nhận dữ liệu thống kê chuyên sâu và tư vấn quản trị vị thế."
+      };
+    }
+
+    let grossProfit = 0;
+    let grossLoss = 0;
+
+    closedTrades.forEach(t => {
+      const pnlVal = Math.abs(t.pnl);
+      if (t.status === 'won') {
+        grossProfit += pnlVal;
+      } else {
+        grossLoss += pnlVal;
+      }
+    });
+
+    let valStr = '0.00';
+    let rating = 'Yếu';
+    let color = 'text-rose-500';
+    let advice = '';
+
+    if (grossLoss === 0) {
+      if (grossProfit > 0) {
+        valStr = '∞';
+        rating = 'Xuất Sắc 👑';
+        color = 'text-emerald-400';
+        advice = "Chỉ số Profit Factor đạt mức vô hạn tuyệt đối (không có lệnh lỗ)! Đây là khởi đầu vô cùng tuyệt vời. Hãy giữ vững kỷ luật quản trị vốn chặt chẽ để duy trì phong độ đỉnh cao này dài lâu.";
+      } else {
+        valStr = '0.00';
+        rating = 'Yêu cầu dữ liệu';
+        color = 'text-slate-500';
+        advice = "Hệ thống chưa ghi nhận lợi nhuận thực tế từ các lệnh thắng. Hãy tiếp tục bám sát kế hoạch R:R để thu về dòng lợi nhuận dương.";
+      }
+    } else {
+      const factor = grossProfit / grossLoss;
+      valStr = factor.toFixed(2);
+
+      if (factor >= 2.0) {
+        rating = 'Xuất Sắc 👑';
+        color = 'text-emerald-400';
+        advice = "Profit Factor đạt mức xuất sắc (>= 2.0), cho thấy hệ thống đang tạo lợi nhuận vượt bậc so với sụt giảm. Hãy tuyệt đối kìm nén sự tự tin hưng phấn thái quá, luôn duy trì kế hoạch rủi ro định sẵn.";
+      } else if (factor >= 1.5) {
+        rating = 'Rất Tốt 👍';
+        color = 'text-teal-400';
+        advice = "Profit Factor trong mức lý tưởng (1.5 - 2.0), khẳng định hệ thống đang vận hành sinh lời bền vững. Hãy tiếp tục bám sát quy chuẩn hiện tại.";
+      } else if (factor >= 1.0) {
+        rating = 'Tạm ổn 📈';
+        color = 'text-yellow-500';
+        advice = "Profit Factor > 1.0 là có lãi nhưng biên an toàn thấp. Bạn nên gồng lãi (TP) chuẩn và dài hơn hoặc kiểm soát chặt chẽ các lệnh thua nhỏ hơn để tăng hiệu suất.";
+      } else {
+        rating = 'Thua lỗ ⚠️';
+        color = 'text-rose-500';
+        advice = "Profit Factor dưới 1.0 cảnh báo tài khoản đang thua lỗ ròng. Hãy ngưng ngay các lệnh nhồi không có kế hoạch, nghiêm túc rà soát lại khoảng dừng lỗ SL và khối lượng rủi ro của từng lệnh!";
+      }
+    }
+
+    return {
+      val: valStr,
+      rating,
+      color,
+      totalGrossProfit: grossProfit,
+      totalGrossLoss: grossLoss,
+      advice
+    };
+  }, [closedTrades]);
+
   // Premium Features: Download reporters
   const downloadCSV = () => {
     if (closedTrades.length === 0) return;
@@ -840,7 +915,7 @@ export default function PortfolioTracker({
           </h4>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 animate-fadeIn">
           {/* CARD 1: Expected Value (EV) by Setup Type */}
           <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
             <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
@@ -949,7 +1024,64 @@ export default function PortfolioTracker({
             )}
           </div>
 
-          {/* CARD 3: Drawdown Distribution */}
+          {/* CARD 3: Profit Factor */}
+          <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
+            <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
+              <div>
+                <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider mb-2 text-slate-400">Hệ Số Profit Factor</span>
+                <div className="flex items-baseline gap-1.5 mb-2 border-b border-slate-800/80 pb-2">
+                  <span className={`text-xl font-black font-mono tracking-tight ${profitFactor.color}`}>
+                    {profitFactor.val}
+                  </span>
+                  <span className={`text-[8px] font-bold ${profitFactor.color} uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800`}>
+                    {profitFactor.rating}
+                  </span>
+                </div>
+
+                <div className="space-y-1 mt-2 text-xs text-slate-350">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-450 font-medium">Tổng lãi gộp (Gross Profit):</span>
+                    <span className="font-mono font-bold text-emerald-450">+${profitFactor.totalGrossProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-450 font-medium font-sans">Tổng lỗ gộp (Gross Loss):</span>
+                    <span className="font-mono font-bold text-rose-450">-${profitFactor.totalGrossLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-300 font-sans leading-relaxed p-2 border-l-2 border-amber-500 bg-amber-500/[0.03] mt-2 rounded max-h-18 overflow-y-auto">
+                    <span className="text-amber-400 font-bold block mb-0.5">Note Tư Vấn:</span>
+                    "{profitFactor.advice}"
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[9px] text-slate-500 leading-normal border-t border-slate-850 pt-2 font-sans font-medium mt-2">
+                Tỉ lệ gộp của các lệnh Thắng so với Thua. Nên duy trì trên mức 1.5 để đảm bảo an toàn dòng vốn dài hạn.
+              </div>
+            </div>
+
+            {/* Locked Paywall Overlay */}
+            {isProLocked && (
+              <div 
+                onClick={() => onTriggerPaywall?.()}
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 bg-slate-950/85 backdrop-blur-[7px] cursor-pointer text-center group transition duration-300 border border-slate-800/80 rounded-2xl"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 flex items-center justify-center mb-2.5 transition shadow-lg shadow-amber-950/20 group-hover:scale-110">
+                  <Lock className="w-5.5 h-5.5 text-amber-455 shrink-0" />
+                </div>
+                <h4 className="text-[10px] font-black text-amber-455 uppercase tracking-widest mb-1 font-sans">
+                  PRO PROFIT FACTOR
+                </h4>
+                <p className="text-[9.5px] text-slate-300 max-w-sm leading-snug mb-3.5 font-medium">
+                  Xem chi tiết chỉ số tỉ số Lãi/Lỗ ròng kèm theo lời tư vấn tối ưu hiệu năng.
+                </p>
+                <span className="text-[8.5px] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider shadow-sm group-hover:bg-amber-400 transition font-mono">
+                  PRO ACCESS 👑
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* CARD 4: Drawdown Distribution */}
           <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
             <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
               <div>
@@ -1031,7 +1163,7 @@ export default function PortfolioTracker({
             )}
           </div>
 
-          {/* CARD 4: Streak Patterns & Counselor */}
+          {/* CARD 5: Streak Patterns & Counselor */}
           <div className="relative overflow-hidden bg-[#14171F] border border-slate-800 p-4.5 rounded-2xl flex flex-col justify-between min-h-[220px] transition group hover:border-slate-700">
             <div className={isProLocked ? 'blur-[8px] pointer-events-none select-none opacity-30 h-full flex flex-col justify-between' : 'h-full flex flex-col justify-between'}>
               <div>
