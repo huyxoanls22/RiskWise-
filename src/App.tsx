@@ -137,6 +137,49 @@ export default function App() {
   });
 
   const [showAffiliateDropdown, setShowAffiliateDropdown] = useState(false);
+
+  // White-label state for KOL using URL parameter reference or local storage
+  const [partnerRef, setPartnerRef] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('ref')) {
+        const refParam = params.get('ref');
+        if (refParam === null || refParam.trim() === '' || refParam.trim().toLowerCase() === 'clear' || refParam.trim().toLowerCase() === 'default') {
+          localStorage.removeItem('rw_ref_partner');
+          return null;
+        }
+        const cleanRef = refParam.trim().toLowerCase();
+        localStorage.setItem('rw_ref_partner', cleanRef);
+        return cleanRef;
+      }
+      return localStorage.getItem('rw_ref_partner');
+    } catch {
+      return null;
+    }
+  });
+
+  // Dynamically update state if a different URL parameters reference is passed
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('ref')) {
+        const refParam = params.get('ref');
+        if (refParam === null || refParam.trim() === '' || refParam.trim().toLowerCase() === 'clear' || refParam.trim().toLowerCase() === 'default') {
+          if (partnerRef !== null) {
+            localStorage.removeItem('rw_ref_partner');
+            setPartnerRef(null);
+          }
+        } else {
+          const cleanRef = refParam.trim().toLowerCase();
+          if (cleanRef !== partnerRef) {
+            localStorage.setItem('rw_ref_partner', cleanRef);
+            setPartnerRef(cleanRef);
+          }
+        }
+      }
+    } catch {}
+  }, [partnerRef]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -294,6 +337,67 @@ export default function App() {
   const [activationKey, setActivationKey] = useState('');
   const [activationError, setActivationError] = useState<string | null>(null);
   const [isVerifyingActivation, setIsVerifyingActivation] = useState(false);
+
+  // Dynamically decode billing details based on activation key entered or default selected plan
+  const getBilledDetails = () => {
+    const key = activationKey.trim();
+    if (key.startsWith("RW-MTH-")) {
+      return {
+        plan: 'monthly' as const,
+        originalPrice: 89000,
+        finalPrice: 89000,
+        discountText: "",
+        hasDiscount: false,
+        label: "Gói Tháng Tiêu Chuẩn"
+      };
+    } else if (key.startsWith("RW-YEAR-")) {
+      return {
+        plan: 'yearly' as const,
+        originalPrice: 828000,
+        finalPrice: 828000,
+        discountText: "",
+        hasDiscount: false,
+        label: "Gói Năm Tiêu Chuẩn"
+      };
+    } else if (key.startsWith("RW5-MTH-")) {
+      return {
+        plan: 'monthly' as const,
+        originalPrice: 89000,
+        finalPrice: 84550,
+        discountText: "✓ Đã áp dụng ưu đãi giảm bớt 5%",
+        hasDiscount: true,
+        label: "Gói Tháng Ưu Đãi 5%"
+      };
+    } else if (key.startsWith("RW10-YEAR-")) {
+      return {
+        plan: 'yearly' as const,
+        originalPrice: 828000,
+        finalPrice: 745200,
+        discountText: "✓ Đã áp dụng ưu đãi giảm giá 10%",
+        hasDiscount: true,
+        label: "Gói Năm Ưu Đãi 10%"
+      };
+    }
+    
+    // Default fallback to user-selected paywallPlan
+    return {
+      plan: paywallPlan,
+      originalPrice: paywallPlan === 'monthly' ? 89000 : 828000,
+      finalPrice: paywallPlan === 'monthly' ? 89000 : 828000,
+      discountText: "",
+      hasDiscount: false,
+      label: paywallPlan === 'monthly' ? "Gói Tháng Tiêu Chuẩn" : "Gói Năm VIP"
+    };
+  };
+
+  const billedDetails = getBilledDetails();
+
+  const getTransferContent = () => {
+    const planName = billedDetails.plan === 'monthly' ? 'thang' : 'nam';
+    const emailStr = activationEmail.trim() || 'email-cua-ban';
+    const refStr = partnerRef ? ` ${partnerRef.toUpperCase()}` : '';
+    return `goi ${planName} ${emailStr}${refStr}`;
+  };
 
 
 
@@ -1038,7 +1142,7 @@ export default function App() {
     <div className="min-h-screen bg-[#0B0E14] text-slate-200 font-sans antialiased selection:bg-indigo-950 selection:text-indigo-300 flex flex-col pb-0">
       {/* Top clean header */}
       <header className="border-b border-slate-800/80 bg-[#0B0E14] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="bg-gradient-to-tr from-indigo-650 to-indigo-550 p-2 rounded-xl shadow-xs text-white">
               <ShieldCheck className="w-5 h-5 text-indigo-100" />
@@ -1054,6 +1158,7 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-3">
+
             {/* Premium Indicator Badge/Toggle Button */}
             {isPremium ? (
               <div 
@@ -1066,7 +1171,9 @@ export default function App() {
               </div>
             ) : (
               <button
-                onClick={() => setShowPaywall(true)}
+                onClick={() => {
+                  setShowPaywall(true);
+                }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 border border-amber-500/20 text-slate-900 rounded-xl text-[11px] font-black cursor-pointer transition uppercase tracking-wider select-none shadow-md shadow-amber-950/30 font-sans"
                 title="Nâng cấp Premium gỡ bỏ giới hạn rủi ro"
               >
@@ -1074,6 +1181,7 @@ export default function App() {
                 <span>Nâng cấp VIP</span>
               </button>
             )}
+
             {/* Affiliate Button with dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -1670,6 +1778,15 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* Subtle Watermark Credit in bottom-right corner */}
+                <div className="lg:col-span-12 flex justify-end items-center gap-2 mt-4 select-none pb-2">
+                  <span className="font-mono text-[9px] text-slate-500/45 uppercase tracking-widest leading-none">
+                    {partnerRef 
+                      ? `Được giới thiệu bởi ${partnerRef.toUpperCase()}` 
+                      : "Được quản lý rủi ro bởi RiskWise"}
+                  </span>
+                </div>
               </div>
             </motion.div>
           )}
@@ -2008,7 +2125,7 @@ export default function App() {
                       <div className="space-y-4 font-sans">
                         {/* Header Title */}
                         <div className="text-center">
-                          <div className="mx-auto w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-1.5">
+                          <div className="mx-auto w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-1.5 font-sans">
                             <Crown className="w-5 h-5 text-amber-400" />
                           </div>
                           <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-widest font-sans">
@@ -2030,9 +2147,14 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-3.5 items-stretch">
                           {/* GÓI THÁNG - VIỀN XÁM MỜ - TỐI GIẢN */}
                           <div 
-                            onClick={() => setPaywallPlan('monthly')}
+                            onClick={() => {
+                              const key = activationKey.trim();
+                              if (!key.startsWith("RW-MTH-") && !key.startsWith("RW-YEAR-") && !key.startsWith("RW5-MTH-") && !key.startsWith("RW10-YEAR-")) {
+                                setPaywallPlan('monthly');
+                              }
+                            }}
                             className={`p-3.5 rounded-2xl border transition duration-200 cursor-pointer flex flex-col justify-between relative ${
-                              paywallPlan === 'monthly'
+                              billedDetails.plan === 'monthly'
                                 ? 'bg-slate-900 border-slate-700 text-white shadow-lg'
                                 : 'bg-slate-950/40 border-slate-850/80 text-slate-400 hover:border-slate-800 hover:bg-slate-900/10'
                             }`}
@@ -2046,9 +2168,14 @@ export default function App() {
 
                           {/* GÓI NĂM - NỔI BẬT KHUYÊN DÙNG */}
                           <div 
-                            onClick={() => setPaywallPlan('yearly')}
+                            onClick={() => {
+                              const key = activationKey.trim();
+                              if (!key.startsWith("RW-MTH-") && !key.startsWith("RW-YEAR-") && !key.startsWith("RW5-MTH-") && !key.startsWith("RW10-YEAR-")) {
+                                setPaywallPlan('yearly');
+                              }
+                            }}
                             className={`p-3.5 rounded-2xl border-2 transition duration-200 cursor-pointer flex flex-col justify-between relative ${
-                              paywallPlan === 'yearly'
+                              billedDetails.plan === 'yearly'
                                 ? 'bg-[#10131e] border-amber-500 text-white shadow-xl'
                                 : 'bg-slate-950/40 border-slate-850/85 text-slate-400 hover:border-slate-755 hover:bg-slate-900/15'
                             }`}
@@ -2086,9 +2213,9 @@ export default function App() {
                                 <img
                                   referrerPolicy="no-referrer"
                                   src={`https://img.vietqr.io/image/TCB-19050048400017-qr_only.png?amount=${
-                                    paywallPlan === 'monthly' ? 89000 : 828000
+                                    billedDetails.finalPrice
                                   }&addInfo=${encodeURIComponent(
-                                    `goi ${paywallPlan === 'monthly' ? 'thang' : 'nam'} ${activationEmail.trim() || 'email-cua-ban'}`
+                                    getTransferContent()
                                   )}&accountName=BE%2520QUANG%2520HUY`}
                                   alt="VietQR Techcombank Scanner"
                                   className="w-full h-full object-contain rounded-xl"
@@ -2146,25 +2273,32 @@ export default function App() {
 
                               <div className="grid grid-cols-10 gap-1.5 items-center font-sans">
                                 <span className="col-span-3 text-slate-400 font-semibold text-[11px] font-sans">Số tiền:</span>
-                                <div className="col-span-7 flex items-center justify-between bg-[#0e111a] px-3 py-1.5 rounded-xl border border-slate-800/80 font-mono font-extrabold text-[#F59E0B] font-sans">
-                                  <span className="text-amber-400 font-black text-xs select-all font-sans">
-                                    {paywallPlan === 'monthly' ? '89.000' : '828.000'} VNĐ
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopyPaymentInfo(paywallPlan === 'monthly' ? '89000' : '828000', 'bank_amt')}
-                                    className="text-slate-400 hover:text-amber-400 p-0.5 transition cursor-pointer font-sans"
-                                  >
-                                    {copiedField === 'bank_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400 font-sans" /> : <Copy className="w-3.5 h-3.5 font-sans" />}
-                                  </button>
+                                <div className="col-span-7 flex flex-col gap-1">
+                                  <div className="flex items-center justify-between bg-[#0e111a] px-3 py-1.5 rounded-xl border border-slate-800/80 font-mono font-extrabold text-[#F59E0B] font-sans">
+                                    <span className="text-amber-400 font-black text-xs select-all font-sans">
+                                      {billedDetails.finalPrice.toLocaleString('vi-VN')} VNĐ
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyPaymentInfo(String(billedDetails.finalPrice), 'bank_amt')}
+                                      className="text-slate-400 hover:text-amber-400 p-0.5 transition cursor-pointer font-sans"
+                                    >
+                                      {copiedField === 'bank_amt' ? <Check className="w-3.5 h-3.5 text-emerald-400 font-sans" /> : <Copy className="w-3.5 h-3.5 font-sans" />}
+                                    </button>
+                                  </div>
+                                  {billedDetails.hasDiscount && (
+                                    <span className="text-[10px] text-emerald-400 font-bold leading-none font-sans px-1 text-left">
+                                      {billedDetails.discountText}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          <div className="text-[11px] text-slate-350 leading-relaxed bg-amber-500/[0.02] border border-amber-550/10 p-3 rounded-xl font-sans font-medium">
+                          <div className="text-[11px] text-slate-350 leading-relaxed bg-amber-500/[0.02] border border-amber-550/10 p-3 rounded-xl font-sans font-medium text-left">
                             <span className="text-amber-450 font-bold block mb-1 text-xs uppercase tracking-wider">📌 CÚ PHÁP CHUYỂN KHOẢN:</span>
-                            Khách hàng mua gói vui lòng chuyển khoản với nội dung: <span className="text-amber-400 font-extrabold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">gói Tháng hoặc gói Năm + email của bạn</span> (ví dụ: <span className="text-white italic font-bold select-all">goi nam tradervietnam@gmail.com</span>).
+                            Khách hàng mua gói vui lòng chuyển khoản với nội dung: <span className="text-amber-400 font-extrabold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">Cú pháp chính xác</span> (ví dụ: <span className="text-white italic font-bold select-all">{getTransferContent()}</span>).
                           </div>
                         </div>
 

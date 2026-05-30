@@ -27,17 +27,20 @@ const base64Decode = (str: string): string => {
 };
 
 /**
- * Generates a valid license key format `RWP-[Payload]-[Signature]`
+ * Generates a valid license key format `[Prefix][Payload]-[Signature]`
  * @param email User's registration email
  * @param expiryDate Expiration date in format YYYY-MM-DD
+ * @param prefix One of the four custom prefixes
  */
-export const generateLicenseKey = (email: string, expiryDate: string): string => {
+export const generateLicenseKey = (email: string, expiryDate: string, prefix: string = "RWP-"): string => {
   const cleanEmail = email.trim().toLowerCase();
   const cleanExpiry = expiryDate.trim(); // Format: YYYY-MM-DD
   const payload = `${cleanEmail}:${cleanExpiry}`;
   const encodedPayload = base64Encode(payload);
   const signature = simpleHash(`${payload}:${SECRET_SIGNING_KEY}`);
-  return `RWP-${encodedPayload}-${signature}`;
+  // If prefix already has trailing hyphen, use it as is; otherwise add one
+  const safePrefix = prefix.endsWith("-") ? prefix : `${prefix}-`;
+  return `${safePrefix}${encodedPayload}-${signature}`;
 };
 
 interface LicenseVerifyResult {
@@ -54,17 +57,28 @@ export const verifyLicenseKey = (email: string, licenseKey: string): LicenseVeri
   const cleanEmail = email.trim().toLowerCase();
   const trimmedKey = licenseKey.trim();
 
-  if (!trimmedKey.startsWith("RWP-")) {
-    return { isValid: false, error: "Định dạng mã kích hoạt không hợp lệ (Phải bắt đầu với RWP-)" };
+  // Find matching prefix
+  const supportedPrefixes = ["RW-MTH-", "RW-YEAR-", "RW5-MTH-", "RW10-YEAR-", "RWP-"];
+  let matchedPrefix = "";
+  for (const p of supportedPrefixes) {
+    if (trimmedKey.startsWith(p)) {
+      matchedPrefix = p;
+      break;
+    }
   }
 
-  const parts = trimmedKey.split("-");
-  if (parts.length !== 3) {
+  if (!matchedPrefix) {
+    return { isValid: false, error: "Định dạng mã kích hoạt không hợp lệ (Phải bắt đầu bằng một tiền tố hợp lệ như RW-MTH-, RW-YEAR-, RW5-MTH- hoặc RW10-YEAR-)" };
+  }
+
+  const rest = trimmedKey.substring(matchedPrefix.length);
+  const parts = rest.split("-");
+  if (parts.length !== 2) {
     return { isValid: false, error: "Mã kích hoạt không đúng định dạng (Thiếu thành phần)" };
   }
 
-  const encodedPayload = parts[1];
-  const givenSignature = parts[2].toUpperCase();
+  const encodedPayload = parts[0];
+  const givenSignature = parts[1].toUpperCase();
 
   const decodedPayload = base64Decode(encodedPayload);
   if (!decodedPayload || !decodedPayload.includes(":")) {

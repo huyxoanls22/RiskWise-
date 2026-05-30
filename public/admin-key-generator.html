@@ -19,7 +19,7 @@
     }
   </style>
 </head>
-<body class="bg-[#06080C] text-slate-100 min-h-screen flex items-center justify-center p-4">
+<body class="bg-[#06080C] text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 gap-6">
   
   <div class="max-w-md w-full bg-[#10131A] border border-amber-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
     <!-- Decorative background glow -->
@@ -53,16 +53,17 @@
         >
       </div>
 
-      <!-- Duration Selection -->
+      <!-- Key Options Dropdown Selector -->
       <div class="space-y-1">
-        <label for="duration" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thời hạn gói cước:</label>
+        <label for="key-prefix" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tỳ chọn Gói cước License Key:</label>
         <select 
-          id="duration" 
+          id="key-prefix" 
           class="w-full bg-[#080a0f] border border-slate-800 text-slate-200 focus:border-amber-550 focus:ring-1 focus:ring-amber-500/50 focus:outline-none text-xs py-2.5 px-3.5 rounded-xl transition duration-150 cursor-pointer"
         >
-          <option value="30">Gói Tháng Pro (30 ngày)</option>
-          <option value="365" selected>Gói Năm VIP (365 ngày)</option>
-          <option value="-5">Gói Hết Hạn Ngay (Dành cho kiểm thử)</option>
+          <option value="RW-MTH-" selected>Gói tháng tiêu chuẩn (RW-MTH-)</option>
+          <option value="RW-YEAR-">Gói năm tiêu chuẩn (RW-YEAR-)</option>
+          <option value="RW5-MTH-">Gói tháng ưu đãi giảm 5% (RW5-MTH-)</option>
+          <option value="RW10-YEAR-">Gói năm ưu đãi giảm 10% (RW10-YEAR-)</option>
         </select>
       </div>
 
@@ -107,7 +108,7 @@
           id="license-output" 
           readonly 
           rows="3" 
-          class="w-full bg-[#080a0f] border border-emerald-900/40 text-slate-300 placeholder-slate-600 focus:outline-none font-mono text-[11px] leading-relaxed p-3.5 rounded-xl resize-none select-all select-text border border-emerald-500/20"
+          class="w-full bg-[#080a0f] border border-emerald-950/20 text-slate-300 placeholder-slate-600 focus:outline-none font-mono text-[11px] leading-relaxed p-3.5 rounded-xl resize-none select-all select-text border border-emerald-500/20"
         ></textarea>
         
         <p class="text-[10px] text-slate-500 text-center font-medium italic">
@@ -115,6 +116,25 @@
         </p>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Key History Container -->
+  <div class="max-w-md w-full bg-[#10131A] border border-slate-800/80 rounded-3xl p-6 shadow-2xl relative overflow-hidden" id="history-card" style="display: none;">
+    <h3 class="text-xs font-bold text-amber-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+      📋 Lịch sử đúc License Key (LocalStorage)
+    </h3>
+    <div class="space-y-2.5 max-h-60 overflow-y-auto pr-1 text-xs" id="history-list">
+      <!-- Generated items will be listed here -->
+    </div>
+    <div class="mt-4 flex justify-end">
+      <button 
+        type="button" 
+        id="btn-clear-history" 
+        class="text-[10px] text-rose-400 hover:text-rose-350 font-bold uppercase tracking-wider bg-transparent border-0 cursor-pointer underline hover:no-underline"
+      >
+        Xóa lịch sử 🗑️
+      </button>
     </div>
   </div>
 
@@ -143,12 +163,73 @@
     // Controller handlers
     const btnGenerate = document.getElementById('btn-generate');
     const inputEmail = document.getElementById('email');
-    const selectDuration = document.getElementById('duration');
+    const selectPrefix = document.getElementById('key-prefix');
     const errorBox = document.getElementById('error-box');
     const errorMessage = document.getElementById('error-message');
     const resultBox = document.getElementById('result-box');
     const licenseOutput = document.getElementById('license-output');
     const btnCopy = document.getElementById('btn-copy');
+
+    // Helper function to render history from localStorage
+    const renderHistory = () => {
+      const historyCard = document.getElementById('history-card');
+      const historyList = document.getElementById('history-list');
+      try {
+        const storedKeysStr = localStorage.getItem('rw_generated_keys') || '[]';
+        const storedKeys = JSON.parse(storedKeysStr);
+        if (storedKeys.length > 0) {
+          historyCard.style.display = 'block';
+          historyList.innerHTML = '';
+          // Show starting from newest first
+          [...storedKeys].reverse().forEach((item) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = "p-2.5 bg-[#080a0f] border border-slate-800 rounded-xl space-y-1 relative group";
+            
+            // Format nice human-readable prefix labels
+            let label = "Gói tháng";
+            if (item.prefix === "RW10-YEAR-") label = "Gói năm (giảm 10%)";
+            else if (item.prefix === "RW5-MTH-") label = "Gói tháng (giảm 5%)";
+            else if (item.prefix === "RW-YEAR-") label = "Gói năm";
+
+            itemDiv.innerHTML = `
+              <div class="flex justify-between items-center">
+                <span class="font-bold text-amber-500 text-[10px] uppercase font-mono">${label}</span>
+                <span class="text-[9px] text-slate-500 font-mono">Hạn: ${item.expiryDate}</span>
+              </div>
+              <div class="text-[10px] text-slate-350 truncate">Email: <span class="text-white font-medium">${item.email}</span></div>
+              <div class="flex items-center gap-1.5 mt-1">
+                <input value="${item.key}" readonly class="bg-[#05070a] border border-slate-900 text-slate-400 font-mono text-[9px] px-1.5 py-0.5 rounded flex-1 select-all" type="text" />
+                <button type="button" class="btn-copy-item text-[9px] text-amber-500 hover:text-amber-400 font-bold transition cursor-pointer">
+                  Copy
+                </button>
+              </div>
+            `;
+            
+            // Add copy action
+            const copyBtn = itemDiv.querySelector('.btn-copy-item');
+            copyBtn.addEventListener('click', () => {
+              navigator.clipboard.writeText(item.key).then(() => {
+                copyBtn.textContent = "Ok! ✓";
+                copyBtn.classList.remove('text-amber-500');
+                copyBtn.classList.add('text-emerald-400');
+                setTimeout(() => {
+                  copyBtn.textContent = "Copy";
+                  copyBtn.classList.add('text-amber-500');
+                  copyBtn.classList.remove('text-emerald-400');
+                }, 1000);
+              });
+            });
+
+            historyList.appendChild(itemDiv);
+          });
+        } else {
+          historyCard.style.display = 'none';
+        }
+      } catch (e) {
+        console.error(e);
+        historyCard.style.display = 'none';
+      }
+    };
 
     btnGenerate.addEventListener('click', () => {
       // Clear output
@@ -162,7 +243,11 @@
         return;
       }
 
-      const daysToAdd = parseInt(selectDuration.value, 10);
+      const prefix = selectPrefix.value;
+      let daysToAdd = 30; // default for month
+      if (prefix.includes("YEAR")) {
+        daysToAdd = 365;
+      }
       
       // Calculate target Expiration Date representation (YYYY-MM-DD)
       const expiryDate = new Date();
@@ -184,11 +269,37 @@
       }
 
       const signature = simpleHash(`${payloadStr}:${SECRET_SIGNING_KEY}`);
-      const finalLicenseKey = `RWP-${encodedPayload}-${signature}`;
+      const finalLicenseKey = `${prefix}${encodedPayload}-${signature}`;
+
+      // Save to shared localStorage using key 'rw_generated_keys'
+      try {
+        const storedKeysStr = localStorage.getItem('rw_generated_keys') || '[]';
+        const storedKeys = JSON.parse(storedKeysStr);
+        storedKeys.push({
+          email: email,
+          key: finalLicenseKey,
+          prefix: prefix,
+          generatedAt: new Date().toISOString(),
+          expiryDate: targetExpiryStr
+        });
+        localStorage.setItem('rw_generated_keys', JSON.stringify(storedKeys));
+      } catch (e) {
+        console.error("Local storage error:", e);
+      }
 
       // Set output fields safely
       licenseOutput.value = finalLicenseKey;
       resultBox.classList.remove('hidden');
+      renderHistory();
+    });
+
+    // Listen on clear history
+    const btnClearHistory = document.getElementById('btn-clear-history');
+    btnClearHistory.addEventListener('click', () => {
+      if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử đúc key trong LocalStorage?')) {
+        localStorage.removeItem('rw_generated_keys');
+        renderHistory();
+      }
     });
 
     btnCopy.addEventListener('click', () => {
@@ -203,6 +314,9 @@
         }, 1800);
       });
     });
+
+    // Run render history initially
+    renderHistory();
   </script>
 </body>
 </html>
