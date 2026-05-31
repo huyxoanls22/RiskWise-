@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/license/verify",
+      "destination": "/api/license-verify"
+    },
+    {
+      "source": "/api/license/verify-admin",
+      "destination": "/api/license-verify-admin"
+    },
+    {
+      "source": "/api/license/generate",
+      "destination": "/api/license-generate"
+    },
+    {
+      "source": "/api/twelvedata",
+      "destination": "/api/twelvedata"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

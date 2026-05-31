@@ -21,7 +21,50 @@
 </head>
 <body class="bg-[#06080C] text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 gap-6">
   
-  <div class="max-w-md w-full bg-[#10131A] border border-amber-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+  <!-- Secure PIN Gate -->
+  <div id="pin-verification-gate" class="max-w-md w-full bg-[#10131A] border border-amber-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+    <!-- Decorative background glow -->
+    <div class="absolute -right-16 -top-16 w-36 h-36 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="absolute -left-16 -bottom-16 w-36 h-36 bg-indigo-550/5 rounded-full blur-2xl pointer-events-none"></div>
+
+    <!-- Header -->
+    <div class="text-center mb-6 relative">
+      <div class="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mb-3">
+        <!-- Lock Icon SVG -->
+        <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      </div>
+      <h1 class="text-base font-extrabold text-white tracking-widest uppercase font-sans">CỔNG BẢO MẬT RISKWISE</h1>
+      <p class="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider font-sans">Xác thực Quyền Admin tạo License Key</p>
+    </div>
+
+    <div class="space-y-4">
+      <div class="space-y-1.5">
+        <label for="admin-pin" class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest font-sans">Nhập mã PIN xác nhận quản trị viên:</label>
+        <input 
+          type="password" 
+          id="admin-pin" 
+          placeholder="Mật khẩu của bạn" 
+          class="w-full bg-[#080a0f] border border-slate-800 text-slate-100 placeholder-slate-700 focus:border-amber-550 focus:ring-1 focus:ring-amber-500/50 focus:outline-none text-xs py-2.5 px-3.5 rounded-xl transition duration-150 font-sans font-bold tracking-widest text-center"
+        >
+      </div>
+
+      <button 
+        type="button" 
+        id="btn-verify-pin"
+        class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-955 text-xs font-black rounded-xl transition duration-150 uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-950/20 font-sans"
+      >
+        MỞ KHÓA HỆ THỐNG
+      </button>
+
+      <div id="pin-error-box" class="p-3 bg-rose-950/20 border border-rose-900/30 text-rose-400 text-xs rounded-xl hidden text-center font-bold">
+        ❌ Mã PIN xác thực sai! Hãy kiểm tra lại hoặc liên hệ DEV.
+      </div>
+    </div>
+  </div>
+
+  <div id="generator-main-card" class="max-w-md w-full bg-[#10131A] border border-amber-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden" style="display: none;">
     <!-- Decorative background glow -->
     <div class="absolute -right-16 -top-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
     <div class="absolute -left-16 -bottom-16 w-36 h-36 bg-indigo-550/15 rounded-full blur-2xl pointer-events-none"></div>
@@ -139,27 +182,6 @@
   </div>
 
   <script>
-    // System core keys, must match exactly with App configuration inside src/utils/license.ts
-    const SECRET_SIGNING_KEY = "RISKWISE_SECURE_KEY_2026";
-
-    // Hash signature builder
-    const simpleHash = (str) => {
-      let hash = 5381;
-      for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) + hash) + str.charCodeAt(i);
-      }
-      return (hash >>> 0).toString(16).toUpperCase();
-    };
-
-    // Polyfill custom Base64 Encoder to prevent UTF-8 characters breakages
-    const base64Encode = (str) => {
-      try {
-        return btoa(unescape(encodeURIComponent(str)));
-      } catch (e) {
-        return "";
-      }
-    };
-
     // Controller handlers
     const btnGenerate = document.getElementById('btn-generate');
     const inputEmail = document.getElementById('email');
@@ -170,10 +192,78 @@
     const licenseOutput = document.getElementById('license-output');
     const btnCopy = document.getElementById('btn-copy');
 
+    // Secure PIN elements
+    const pinVerificationGate = document.getElementById('pin-verification-gate');
+    const generatorMainCard = document.getElementById('generator-main-card');
+    const inputAdminPin = document.getElementById('admin-pin');
+    const btnVerifyPin = document.getElementById('btn-verify-pin');
+    const pinErrorBox = document.getElementById('pin-error-box');
+
+    const checkAuthorization = () => {
+      if (sessionStorage.getItem('rw_admin_authorized') === 'true') {
+        pinVerificationGate.style.display = 'none';
+        generatorMainCard.style.display = 'block';
+        return true;
+      }
+      return false;
+    };
+
+    const handleVerifyPin = async () => {
+      pinErrorBox.classList.add('hidden');
+      const enteredPinRaw = inputAdminPin.value;
+      if (!enteredPinRaw) return;
+
+      try {
+        btnVerifyPin.disabled = true;
+        btnVerifyPin.textContent = "XÁC THỰC...";
+
+        const res = await fetch('/api/license/verify-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: enteredPinRaw })
+        });
+
+        const data = await res.json();
+        btnVerifyPin.disabled = false;
+        btnVerifyPin.textContent = "MỞ KHÓA HỆ THỐNG";
+
+        if (res.ok && data.authorized) {
+          sessionStorage.setItem('rw_admin_authorized', 'true');
+          sessionStorage.setItem('rw_admin_pin', enteredPinRaw);
+          pinVerificationGate.style.display = 'none';
+          generatorMainCard.style.display = 'block';
+          renderHistory();
+        } else {
+          pinErrorBox.textContent = data.error || "❌ Mã PIN xác thực sai!";
+          pinErrorBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        btnVerifyPin.disabled = false;
+        btnVerifyPin.textContent = "MỞ KHÓA HỆ THỐNG";
+        pinErrorBox.textContent = "❌ Lỗi kết nối đến Server!";
+        pinErrorBox.classList.remove('hidden');
+        console.error(err);
+      }
+    };
+
+    btnVerifyPin.addEventListener('click', handleVerifyPin);
+    inputAdminPin.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        handleVerifyPin();
+      }
+    });
+
+    // Check auth on load
+    checkAuthorization();
+
     // Helper function to render history from localStorage
     const renderHistory = () => {
       const historyCard = document.getElementById('history-card');
       const historyList = document.getElementById('history-list');
+      if (sessionStorage.getItem('rw_admin_authorized') !== 'true') {
+        historyCard.style.display = 'none';
+        return;
+      }
       try {
         const storedKeysStr = localStorage.getItem('rw_generated_keys') || '[]';
         const storedKeys = JSON.parse(storedKeysStr);
@@ -196,7 +286,7 @@
                 <span class="font-bold text-amber-500 text-[10px] uppercase font-mono">${label}</span>
                 <span class="text-[9px] text-slate-500 font-mono">Hạn: ${item.expiryDate}</span>
               </div>
-              <div class="text-[10px] text-slate-350 truncate">Email: <span class="text-white font-medium">${item.email}</span></div>
+              <div class="text-[10px] text-slate-355 truncate">Email: <span class="text-white font-medium">${item.email}</span></div>
               <div class="flex items-center gap-1.5 mt-1">
                 <input value="${item.key}" readonly class="bg-[#05070a] border border-slate-900 text-slate-400 font-mono text-[9px] px-1.5 py-0.5 rounded flex-1 select-all" type="text" />
                 <button type="button" class="btn-copy-item text-[9px] text-amber-500 hover:text-amber-400 font-bold transition cursor-pointer">
@@ -231,7 +321,7 @@
       }
     };
 
-    btnGenerate.addEventListener('click', () => {
+    btnGenerate.addEventListener('click', async () => {
       // Clear output
       errorBox.classList.add('hidden');
       resultBox.classList.add('hidden');
@@ -244,53 +334,58 @@
       }
 
       const prefix = selectPrefix.value;
-      let daysToAdd = 30; // default for month
-      if (prefix.includes("YEAR")) {
-        daysToAdd = 365;
-      }
-      
-      // Calculate target Expiration Date representation (YYYY-MM-DD)
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + daysToAdd);
-      
-      const yyyy = expiryDate.getFullYear();
-      const mm = String(expiryDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(expiryDate.getDate()).padStart(2, '0');
-      const targetExpiryStr = `${yyyy}-${mm}-${dd}`;
+      const adminPin = sessionStorage.getItem('rw_admin_pin');
 
-      // Build signing package
-      const payloadStr = `${email}:${targetExpiryStr}`;
-      const encodedPayload = base64Encode(payloadStr);
-
-      if (!encodedPayload) {
-        errorMessage.textContent = "Lỗi trong quá trình mã hoá cơ số UTF-8.";
-        errorBox.classList.remove('hidden');
-        return;
-      }
-
-      const signature = simpleHash(`${payloadStr}:${SECRET_SIGNING_KEY}`);
-      const finalLicenseKey = `${prefix}${encodedPayload}-${signature}`;
-
-      // Save to shared localStorage using key 'rw_generated_keys'
       try {
-        const storedKeysStr = localStorage.getItem('rw_generated_keys') || '[]';
-        const storedKeys = JSON.parse(storedKeysStr);
-        storedKeys.push({
-          email: email,
-          key: finalLicenseKey,
-          prefix: prefix,
-          generatedAt: new Date().toISOString(),
-          expiryDate: targetExpiryStr
-        });
-        localStorage.setItem('rw_generated_keys', JSON.stringify(storedKeys));
-      } catch (e) {
-        console.error("Local storage error:", e);
-      }
+        btnGenerate.disabled = true;
+        btnGenerate.textContent = "ĐANG TẠO KHÓA...";
 
-      // Set output fields safely
-      licenseOutput.value = finalLicenseKey;
-      resultBox.classList.remove('hidden');
-      renderHistory();
+        const res = await fetch('/api/license/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pin: adminPin,
+            email: email,
+            prefix: prefix
+          })
+        });
+
+        const data = await res.json();
+        btnGenerate.disabled = false;
+        btnGenerate.textContent = "ĐÚC LICENSE KEY CỦA BẠN";
+
+        if (res.ok && data.success && data.key) {
+          // Save to shared localStorage using key 'rw_generated_keys'
+          try {
+            const storedKeysStr = localStorage.getItem('rw_generated_keys') || '[]';
+            const storedKeys = JSON.parse(storedKeysStr);
+            storedKeys.push({
+              email: data.email,
+              key: data.key,
+              prefix: data.prefix,
+              generatedAt: new Date().toISOString(),
+              expiryDate: data.expiryDate
+            });
+            localStorage.setItem('rw_generated_keys', JSON.stringify(storedKeys));
+          } catch (e) {
+            console.error("Local storage error:", e);
+          }
+
+          // Set output fields safely
+          licenseOutput.value = data.key;
+          resultBox.classList.remove('hidden');
+          renderHistory();
+        } else {
+          errorMessage.textContent = data.error || "Lỗi khi lấy thông tin khóa từ Server.";
+          errorBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        btnGenerate.disabled = false;
+        btnGenerate.textContent = "ĐÚC LICENSE KEY CỦA BẠN";
+        errorMessage.textContent = "Không bắt được phản hồi từ Server. Vui lòng thử lại.";
+        errorBox.classList.remove('hidden');
+        console.error(err);
+      }
     });
 
     // Listen on clear history

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AssetClass, TradeSetup, CalculationResult, ChecklistItem, PortfolioTrade, TradingPlan, DailyLimitLog } from './types';
 import { calculatePositionSize, FOREX_PAIRS } from './utils/calculator';
-import { verifyLicenseKey } from './utils/license';
 import ForexCalculator from './components/ForexCalculator';
 import CryptoStockCalculator from './components/CryptoStockCalculator';
 import RiskMeter from './components/RiskMeter';
@@ -217,11 +216,10 @@ export default function App() {
     try {
       const savedKey = localStorage.getItem("trading_license_key");
       const savedEmail = localStorage.getItem("trading_license_email");
-      if (savedKey && savedEmail) {
-        const verification = verifyLicenseKey(savedEmail, savedKey);
-        if (verification.isValid && verification.expiryDate) {
-          return verification.expiryDate.toLocaleDateString('vi-VN');
-        }
+      const isPremium = localStorage.getItem("trading_is_premium") === "true";
+      const cachedExpiry = localStorage.getItem("trading_license_expiry_str");
+      if (savedKey && savedEmail && isPremium && cachedExpiry) {
+        return new Date(cachedExpiry).toLocaleDateString('vi-VN');
       }
     } catch {}
     return "Trọn đời (Unlimited)";
@@ -300,9 +298,31 @@ export default function App() {
         const savedKey = localStorage.getItem("trading_license_key");
         const savedEmail = localStorage.getItem("trading_license_email");
         if (savedKey && savedEmail) {
-          const verification = verifyLicenseKey(savedEmail, savedKey);
-          if (verification.isValid && verification.expiryDate) {
-            if (now >= verification.expiryDate) {
+          let verification: { isValid: boolean; error?: string; expiryDateString?: string } = { isValid: false };
+          try {
+            const res = await fetch("/api/license/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: savedEmail, licenseKey: savedKey })
+            });
+            if (res.ok) {
+              verification = await res.json();
+            }
+          } catch (e) {
+            console.warn("Lỗi kiểm tra bản quyền trực tuyến, sử dụng bộ nhớ tạm:", e);
+            const isLocalPremium = localStorage.getItem("trading_is_premium") === "true";
+            const cachedExpiry = localStorage.getItem("trading_license_expiry_str");
+            if (isLocalPremium && cachedExpiry) {
+              verification = {
+                isValid: true,
+                expiryDateString: cachedExpiry
+              };
+            }
+          }
+
+          if (verification.isValid && verification.expiryDateString) {
+            const expiryDateObj = new Date(verification.expiryDateString);
+            if (now >= expiryDateObj) {
               // Grace period / license expired
               setIsPremium(false);
               localStorage.setItem("trading_is_premium", "false");
@@ -311,7 +331,8 @@ export default function App() {
             } else {
               setIsPremium(true);
               localStorage.setItem("trading_is_premium", "true");
-              setPremiumExpiry(verification.expiryDate.toLocaleDateString("vi-VN"));
+              localStorage.setItem("trading_license_expiry_str", verification.expiryDateString);
+              setPremiumExpiry(expiryDateObj.toLocaleDateString("vi-VN"));
             }
           } else {
             setIsPremium(false);
@@ -416,27 +437,42 @@ export default function App() {
     }
 
     setIsVerifyingActivation(true);
-    setTimeout(() => {
-      setIsVerifyingActivation(false);
-      const verification = verifyLicenseKey(email, key);
-      if (verification.isValid && verification.expiryDate) {
-        const now = currentTime || new Date();
-        if (now >= verification.expiryDate) {
-          setActivationError(`Mã kích hoạt này đã hết hạn vào ngày ${verification.expiryDate.toLocaleDateString('vi-VN')}! Vui lòng gia hạn.`);
-          return;
-        }
+    // Secure online activation verification in standard fetch payload
+    setTimeout(async () => {
+      try {
+        const res = await fetch("/api/license/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email, licenseKey: key })
+        });
+        const verification = await res.json();
+        setIsVerifyingActivation(false);
 
-        // Success!
-        setIsPremium(true);
-        localStorage.setItem('trading_is_premium', 'true');
-        localStorage.setItem('trading_license_key', key);
-        localStorage.setItem('trading_license_email', email);
-        setPremiumExpiry(verification.expiryDate.toLocaleDateString('vi-VN'));
-        setPaymentSuccess(true);
-        setActivationEmail('');
-        setActivationKey('');
-      } else {
-        setActivationError(verification.error || "Mã kích hoạt không đúng hoặc Email không đúng!");
+        if (res.ok && verification.isValid && verification.expiryDateString) {
+          const expiryDateObj = new Date(verification.expiryDateString);
+          const now = currentTime || new Date();
+          if (now >= expiryDateObj) {
+            setActivationError(`Mã kích hoạt này đã hết hạn vào ngày ${expiryDateObj.toLocaleDateString('vi-VN')}! Vui lòng gia hạn.`);
+            return;
+          }
+
+          // Success!
+          setIsPremium(true);
+          localStorage.setItem('trading_is_premium', 'true');
+          localStorage.setItem('trading_license_key', key);
+          localStorage.setItem('trading_license_email', email);
+          localStorage.setItem('trading_license_expiry_str', verification.expiryDateString);
+          setPremiumExpiry(expiryDateObj.toLocaleDateString('vi-VN'));
+          setPaymentSuccess(true);
+          setActivationEmail('');
+          setActivationKey('');
+        } else {
+          setActivationError(verification.error || "Mã kích hoạt không đúng hoặc Email không đúng!");
+        }
+      } catch (err) {
+        setIsVerifyingActivation(false);
+        setActivationError("Không liên kết được tới máy chủ xác minh bản quyền!");
+        console.error(err);
       }
     }, 1200);
   };
@@ -677,17 +713,99 @@ export default function App() {
       const fetchPromises = activeTrades.map(async (trade) => {
         try {
           if (trade.assetClass === 'forex') {
-            if (!forexRates) return;
             const clean = trade.ticker.replace('/', '').toUpperCase();
             const baseCur = clean.substring(0, 3);
             const quoteCur = clean.substring(3, 6);
             
-            const baseRate = forexRates[baseCur];
-            const quoteRate = forexRates[quoteCur];
-            
-            if (baseRate && quoteRate) {
-              const rate = quoteRate / baseRate;
-              updates[trade.id] = rate;
+            let priceSet = false;
+
+            // 1. Try Yahoo Finance live forex spot rates (perfect match with live broker feeds)
+            let yahooTicker = '';
+            if (clean.length === 6) {
+              yahooTicker = `${clean}=X`;
+            } else if (clean === 'XAU' || clean === 'GOLD') {
+              yahooTicker = 'XAUUSD=X';
+            } else if (clean === 'XAG' || clean === 'SILVER') {
+              yahooTicker = 'XAGUSD=X';
+            } else {
+              yahooTicker = `${clean}=X`;
+            }
+
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}`;
+            const endpoints = [
+              `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`,
+              `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`
+            ];
+
+            for (const url of endpoints) {
+              try {
+                const res = await fetch(url);
+                if (res.ok) {
+                  let wrapper = await res.json();
+                  if (wrapper.contents) {
+                    wrapper = JSON.parse(wrapper.contents);
+                  }
+                  const price = wrapper.chart?.result?.[0]?.meta?.regularMarketPrice;
+                  if (price && !isNaN(price)) {
+                    updates[trade.id] = price;
+                    priceSet = true;
+                    break;
+                  }
+                }
+              } catch (e) {
+                console.warn("Sync: Forex spot rate fetch failed for url " + url, e);
+              }
+            }
+
+            // 2. Try commodity futures yahoo fallback, e.g. GC=F or SI=F for gold/silver
+            if (!priceSet && (clean === 'XAUUSD' || clean === 'XAGUSD' || baseCur === 'XAU' || baseCur === 'XAG')) {
+              const futuresTicker = (baseCur === 'XAU') ? 'GC=F' : 'SI=F';
+              const yahooUrlFutures = `https://query1.finance.yahoo.com/v8/finance/chart/${futuresTicker}`;
+              const endpointsFutures = [
+                `https://corsproxy.io/?${encodeURIComponent(yahooUrlFutures)}`,
+                `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrlFutures)}`
+              ];
+              for (const url of endpointsFutures) {
+                try {
+                  const res = await fetch(url);
+                  if (res.ok) {
+                    let wrapper = await res.json();
+                    if (wrapper.contents) {
+                      wrapper = JSON.parse(wrapper.contents);
+                    }
+                    const price = wrapper.chart?.result?.[0]?.meta?.regularMarketPrice;
+                    if (price && !isNaN(price)) {
+                      updates[trade.id] = price;
+                      priceSet = true;
+                      break;
+                    }
+                  }
+                } catch (e) {
+                  console.warn("Sync: Commodity futures fetch failed for url " + url, e);
+                }
+              }
+
+              // Try ER-API stable rates for commodities as secondary fallback
+              if (!priceSet && forexRates) {
+                const targetAsset = (clean === 'XAUUSD' || baseCur === 'XAU') ? 'XAU' : 'XAG';
+                const assetRate = forexRates[targetAsset];
+                if (assetRate && assetRate > 0) {
+                  updates[trade.id] = 1 / assetRate;
+                  priceSet = true;
+                }
+              }
+            }
+
+            // 3. Try general Forex open er-api fallback (stable interbank rates)
+            if (!priceSet && forexRates) {
+              const baseRate = forexRates[baseCur];
+              const quoteRate = forexRates[quoteCur];
+              
+              if (baseRate && quoteRate) {
+                const rate = quoteRate / baseRate;
+                updates[trade.id] = rate;
+                priceSet = true;
+              }
             }
           } else {
             // Crypto / Stock
@@ -1584,8 +1702,9 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-6"
             >
-              {/* Column 1: Pre-Trade Checklist & TradingView Live Chart (Span 3) */}
-              <div className="lg:col-span-3 space-y-6">
+              {/* Column 1: Core Inputs & Checklist (Span 5) */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* Pre-Trade Checklist (Placed on top for maximum priority) */}
                 <PreTradeChecklist
                   items={checklist}
                   onToggleCheck={handleToggleCheck}
@@ -1593,14 +1712,7 @@ export default function App() {
                   onDeleteItem={handleDeleteChecklistItem}
                 />
 
-                <TradingViewWidget
-                  setup={setup}
-                  onApplyLivePrice={(price) => setSetup(prev => ({ ...prev, entryPrice: price }))}
-                />
-              </div>
-
-              {/* Column 2: Core Inputs (Span 5) */}
-              <div className="lg:col-span-5 space-y-6">
+                {/* Core Inputs Card */}
                 <div className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2">
@@ -1643,7 +1755,7 @@ export default function App() {
                       className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
                         setup.assetClass === 'forex'
                           ? 'bg-[#0B0E14] text-indigo-400 shadow-sm border border-slate-800/60'
-                          : 'text-slate-450 hover:text-slate-200'
+                          : 'text-slate-455 hover:text-slate-200'
                       }`}
                     >
                       <span>Forex (Lot/Pips)</span>
@@ -1654,7 +1766,7 @@ export default function App() {
                       className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
                         setup.assetClass === 'crypto_stock'
                           ? 'bg-[#0B0E14] text-emerald-400 shadow-sm border border-slate-800/60'
-                          : 'text-slate-450 hover:text-slate-200'
+                          : 'text-slate-455 hover:text-slate-200'
                       }`}
                     >
                       <span>Crypto &amp; Stocks</span>
@@ -1696,7 +1808,7 @@ export default function App() {
                         </span>
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3.5 top-3.5 text-slate-500 font-bold text-xs">%</span>
+                        <span className="absolute left-3.5 top-3.5 text-slate-550 font-bold text-xs">%</span>
                         <input
                           id="input-daily-limit"
                           type="number"
@@ -1828,7 +1940,7 @@ export default function App() {
                         step="5"
                         value={leverage}
                         onChange={(e) => setLeverage(parseInt(e.target.value))}
-                        className="w-full h-1.5 bg-[#1C212D] rounded-full appearance-none cursor-pointer accent-indigo-505"
+                        className="w-full h-1.5 bg-[#1C212D] rounded-full appearance-none cursor-pointer accent-indigo-550"
                       />
                       <div className="flex justify-between text-[9px] font-mono text-slate-500 mt-1">
                         <span>1:1</span>
@@ -1842,175 +1954,191 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Column 3: Dashboard Results & Charts (Span 4) */}
-              <div className="lg:col-span-4 space-y-6 animate-fadeIn">
-                <div className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between min-h-[415px]">
-                  
-                  <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800">
-                    <Sparkles className="w-4 h-4 text-emerald-400" />
-                    <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Kết quả vị thế</h2>
-                  </div>
-
-                  {/* Massive Output block */}
-                  <div className="bg-[#1C212D] border border-slate-800 rounded-2xl p-6 text-center text-white relative overflow-hidden">
-                    <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none"></div>
-                    <div className="absolute left-0 bottom-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-lg pointer-events-none"></div>
-
-                    <span className="block text-[10px] sm:text-xs font-bold text-indigo-400 font-mono tracking-[0.14em] uppercase mb-1">
-                      KHỐI LƯỢNG VÀO LỆNH TỐI ƯU
-                    </span>
-
-                    <div className="mt-3.5 mb-2.5">
-                      <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white select-all">
-                        {setup.assetClass === 'forex' 
-                          ? (result.positionSizeLots !== undefined ? result.positionSizeLots.toFixed(2) : '0.00') 
-                          : (result.positionSizeUnits !== undefined ? result.positionSizeUnits.toLocaleString('en-US', { maximumFractionDigits: 4 }) : '0')
-                        }
-                      </span>
-                      <span className="text-xs font-bold text-slate-455 font-mono ml-1.5 uppercase">
-                        {setup.assetClass === 'forex' ? 'LOTS' : 'UNITS'}
-                      </span>
-                    </div>
-
-                    <div className="text-[10px] font-mono text-slate-500 flex items-center justify-center gap-1">
-                      <span>Số lượng thô:</span>
-                      <span className="font-bold text-slate-300">
-                        {result.positionSizeUnits.toLocaleString()} units
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Interactive Execution Trigger */}
-                  <div className="space-y-2 mt-4">
-                    <button
-                      type="button"
-                      onClick={handleAttemptLogTrade}
-                      className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl select-none cursor-pointer duration-200 transition-all shadow-md hover:shadow-emerald-950/20 flex items-center justify-center gap-2 uppercase tracking-wider"
-                    >
-                      <Play className="w-4 h-4 fill-current shrink-0" />
-                      Lưu lệnh & Kích hoạt theo dõi
-                    </button>
-                    <p className="text-[10px] text-slate-550 text-center leading-normal">
-                      Nạp tham số vào danh mục mở &amp; kiểm tra kỷ luật kỷ cương.
-                    </p>
-                  </div>
-
-                  {/* Financial Metrics Cards */}
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3">
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Tổn thất tối đa (SL)</span>
-                      <span className="text-sm font-bold font-mono mt-1 block text-rose-500">
-                        -${result.riskAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                      </span>
-                      <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-800/40 pt-1">
-                        <span className="text-[9px] text-slate-500">({riskPct.toFixed(1)}% tài khoản)</span>
-                        <span className="text-[9px] text-slate-400 font-bold">
-                          Tỷ lệ R:R dự kiến: {result.riskRewardRatio !== undefined ? `1:${result.riskRewardRatio >= 1 ? Math.round(result.riskRewardRatio * 10) / 10 : result.riskRewardRatio.toFixed(1)}` : 'Chưa cài TP'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between">
-                      <div>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Giá trị Hợp đồng</span>
-                        <span className="text-sm font-bold font-mono mt-1 block text-slate-100">
-                          ${result.notionalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                      <span className="text-[9px] text-slate-500 block mt-0.5">Quy mô vị thế thực</span>
-                    </div>
-                  </div>
-
-                  {/* Required margin display */}
-                  <div className="mt-4 bg-indigo-950/20 border border-indigo-900/40 rounded-xl p-3 flex items-center justify-between text-xs">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase">Tiền ký quỹ yêu cầu (Margin)</span>
-                      <span className="text-slate-500 text-[9px] mt-0.5">Vốn tối thiểu thực tế cần nạp</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono font-extrabold text-white text-sm">
-                        ${requiredMargin > 0 ? requiredMargin.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '0.00'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Forex Lots reference table */}
-                  {setup.assetClass === 'forex' && (
-                    <div className="mt-4 border-t border-slate-800 pt-3">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5 font-mono">Quy đổi đơn vị tương đương</span>
-                      <div className="grid grid-cols-3 gap-2 text-center text-[9px] font-mono text-slate-400">
-                        <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
-                          <div className="text-slate-500 uppercase text-[8px] tracking-wide">Standard Lots</div>
-                          <div className="font-bold text-slate-200 mt-1">{(result.positionSizeLots || 0).toFixed(2)}</div>
-                        </div>
-                        <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
-                          <div className="text-slate-500 uppercase text-[8px] tracking-wide">Mini Lots</div>
-                          <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 10).toFixed(1)}</div>
-                        </div>
-                        <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
-                          <div className="text-slate-500 uppercase text-[8px] tracking-wide">Micro Lots</div>
-                          <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 100).toFixed(0)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* Live risk evaluation meter */}
-                <RiskMeter 
-                  balance={setup.accountBalance} 
-                  riskAmount={result.riskAmount} 
-                  riskPercentage={riskPct} 
+              {/* Column 2: Chart & Results Dashboard (Span 7) */}
+              <div className="lg:col-span-7 space-y-6">
+                {/* TradingView Live Chart widget */}
+                <TradingViewWidget
+                  setup={setup}
+                  onApplyLivePrice={(price) => setSetup(prev => ({ ...prev, entryPrice: price }))}
                 />
 
-                {/* Affiliate banner */}
-                <div className="bg-[#14171F] border border-indigo-950/70 rounded-2xl p-4.5 text-xs text-indigo-300 relative overflow-hidden flex items-start gap-3 shadow-xs">
-                  <div className="p-2 rounded-xl bg-indigo-950/50 text-indigo-400 mt-0.5 shrink-0">
-                    <Sparkles className="w-4 h-4 animate-pulse" />
+                {/* Grid container for Results side-by-side with RiskMeter and Affiliate */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-fadeIn">
+                  
+                  {/* Results column */}
+                  <div className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between min-h-[415px]">
+                    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                      <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Kết quả vị thế</h2>
+                    </div>
+
+                    {/* Massive Output block */}
+                    <div className="bg-[#1C212D] border border-slate-800 rounded-2xl p-6 text-center text-white relative overflow-hidden">
+                      <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none"></div>
+                      <div className="absolute left-0 bottom-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-lg pointer-events-none"></div>
+
+                      <span className="block text-[10px] sm:text-xs font-bold text-indigo-400 font-mono tracking-[0.14em] uppercase mb-1">
+                        KHỐI LƯỢNG VÀO LỆNH TỐI ƯU
+                      </span>
+
+                      <div className="mt-3.5 mb-2.5">
+                        <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white select-all">
+                          {setup.assetClass === 'forex' 
+                            ? (result.positionSizeLots !== undefined ? result.positionSizeLots.toFixed(2) : '0.00') 
+                            : (result.positionSizeUnits !== undefined ? result.positionSizeUnits.toLocaleString('en-US', { maximumFractionDigits: 4 }) : '0')
+                          }
+                        </span>
+                        <span className="text-xs font-bold text-slate-455 font-mono ml-1.5 uppercase">
+                          {setup.assetClass === 'forex' ? 'LOTS' : 'UNITS'}
+                        </span>
+                      </div>
+
+                      <div className="text-[10px] font-mono text-slate-500 flex items-center justify-center gap-1">
+                        <span>Số lượng thô:</span>
+                        <span className="font-bold text-slate-300">
+                          {result.positionSizeUnits.toLocaleString()} units
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Interactive Execution Trigger */}
+                    <div className="space-y-2 mt-4">
+                      <button
+                        type="button"
+                        onClick={handleAttemptLogTrade}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl select-none cursor-pointer duration-200 transition-all shadow-md hover:shadow-emerald-950/20 flex items-center justify-center gap-2 uppercase tracking-wider"
+                      >
+                        <Play className="w-4 h-4 fill-current shrink-0" />
+                        Lưu lệnh & Kích hoạt theo dõi
+                      </button>
+                      <p className="text-[10px] text-slate-550 text-center leading-normal">
+                        Nạp tham số vào danh mục mở &amp; kiểm tra kỷ luật kỷ cương.
+                      </p>
+                    </div>
+
+                    {/* Financial Metrics Cards */}
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Tổn thất tối đa (SL)</span>
+                        <span className="text-sm font-bold font-mono mt-1 block text-rose-500">
+                          -${result.riskAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                        </span>
+                        <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-800/40 pt-1">
+                          <span className="text-[9px] text-slate-500">({riskPct.toFixed(1)}% tài khoản)</span>
+                          <span className="text-[9px] text-slate-400 font-bold">
+                            Tỷ lệ R:R dự kiến: {result.riskRewardRatio !== undefined ? `1:${result.riskRewardRatio >= 1 ? Math.round(result.riskRewardRatio * 10) / 10 : result.riskRewardRatio.toFixed(1)}` : 'Chưa cài TP'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Giá trị Hợp đồng</span>
+                          <span className="text-sm font-bold font-mono mt-1 block text-slate-100">
+                            ${result.notionalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-slate-500 block mt-0.5">Quy mô vị thế thực</span>
+                      </div>
+                    </div>
+
+                    {/* Required margin display */}
+                    <div className="mt-4 bg-indigo-950/20 border border-indigo-900/40 rounded-xl p-3 flex items-center justify-between text-xs">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-indigo-400 uppercase">Tiền ký quỹ yêu cầu (Margin)</span>
+                        <span className="text-slate-500 text-[9px] mt-0.5">Vốn tối thiểu thực tế cần nạp</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-extrabold text-white text-sm">
+                          ${requiredMargin > 0 ? requiredMargin.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '0.00'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Forex Lots reference table */}
+                    {setup.assetClass === 'forex' && (
+                      <div className="mt-4 border-t border-slate-800 pt-3">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5 font-mono">Quy đổi đơn vị tương đương</span>
+                        <div className="grid grid-cols-3 gap-2 text-center text-[9px] font-mono text-slate-400">
+                          <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
+                            <div className="text-slate-500 uppercase text-[8px] tracking-wide">Standard Lots</div>
+                            <div className="font-bold text-slate-200 mt-1">{(result.positionSizeLots || 0).toFixed(2)}</div>
+                          </div>
+                          <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
+                            <div className="text-slate-500 uppercase text-[8px] tracking-wide">Mini Lots</div>
+                            <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 10).toFixed(1)}</div>
+                          </div>
+                          <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
+                            <div className="text-slate-500 uppercase text-[8px] tracking-wide">Micro Lots</div>
+                            <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 100).toFixed(0)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="font-bold text-slate-100 text-xs tracking-wide uppercase">Mẹo Tối Ưu Chi Phí Trading</h4>
-                    <p className="text-[11px] text-slate-400 leading-relaxed font-sans mt-1">
-                      Kỷ luật quản lý vốn chặt chẽ giúp bạn sống sót lâu dài trong thị trường. Đăng ký tài khoản giao dịch tại các sàn uy tín đối tác để tối ưu hóa thêm 20% chi phí phí:
-                    </p>
-                    <div className="flex gap-2.5 pt-2 flex-wrap">
-                      <a 
-                        href={AFFILIATE_LINKS.binance} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-yellow-450 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
-                      >
-                        Binance <ExternalLink className="w-3 h-3" />
-                      </a>
-                      <a 
-                        href={AFFILIATE_LINKS.exness} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-amber-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
-                      >
-                        Exness <ExternalLink className="w-3 h-3" />
-                      </a>
-                      <a 
-                        href={AFFILIATE_LINKS.the5ers} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-sky-400 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
-                      >
-                        The5ers <ExternalLink className="w-3 h-3" />
-                      </a>
+
+                  {/* Meter & Affiliate column */}
+                  <div className="space-y-6 flex flex-col justify-between">
+                    {/* Live risk evaluation meter */}
+                    <div className="flex-1">
+                      <RiskMeter 
+                        balance={setup.accountBalance} 
+                        riskAmount={result.riskAmount} 
+                        riskPercentage={riskPct} 
+                      />
+                    </div>
+
+                    {/* Affiliate banner */}
+                    <div className="bg-[#14171F] border border-indigo-950/70 rounded-2xl p-4.5 text-xs text-indigo-300 relative overflow-hidden flex items-start gap-3 shadow-xs">
+                      <div className="p-2 rounded-xl bg-indigo-950/50 text-indigo-400 mt-0.5 shrink-0">
+                        <Sparkles className="w-4 h-4 animate-pulse" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-bold text-slate-100 text-xs tracking-wide uppercase">Mẹo Tối Ưu Chi Phí Trading</h4>
+                        <p className="text-[11px] text-slate-401 leading-relaxed font-sans mt-0.5">
+                          Kỷ luật quản lý vốn chặt chẽ giúp bạn sống sót lâu dài trong thị trường. Đăng ký tài khoản giao dịch tại các sàn uy tín đối tác để tối ưu hóa thêm 20% chi phí phí:
+                        </p>
+                        <div className="flex gap-2.5 pt-2 flex-wrap">
+                          <a 
+                            href={AFFILIATE_LINKS.binance} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-yellow-450 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                          >
+                            Binance <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <a 
+                            href={AFFILIATE_LINKS.exness} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-amber-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                          >
+                            Exness <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <a 
+                            href={AFFILIATE_LINKS.the5ers} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-sky-400 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                          >
+                            The5ers <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
                 </div>
 
                 {/* Subtle Watermark Credit in bottom-right corner */}
-                <div className="lg:col-span-12 flex justify-end items-center gap-2 mt-4 select-none pb-2">
+                <div className="flex justify-end items-center gap-2 mt-4 select-none pb-2">
                   <span className="font-mono text-[9px] text-slate-500/45 uppercase tracking-widest leading-none">
                     {partnerRef 
                       ? `Được giới thiệu bởi ${partnerRef.toUpperCase()}` 
                       : "Được quản lý rủi ro bởi RiskWise"}
                   </span>
                 </div>
+
               </div>
             </motion.div>
           )}
@@ -2259,7 +2387,7 @@ export default function App() {
                     <div className="p-4 bg-[#10131A] border border-slate-850 rounded-2xl max-w-md mx-auto text-left space-y-2.5 text-xs sm:text-sm leading-relaxed font-sans">
                       <div className="flex justify-between items-center pb-2 border-b border-slate-850/60">
                         <span className="text-slate-400 font-medium">Email bản quyền:</span>
-                        <span className="font-bold text-slate-100">{localStorage.getItem('trading_license_email') || 'huyxoanls22@gmail.com'}</span>
+                        <span className="font-bold text-slate-100">{localStorage.getItem('trading_license_email') || 'premium@riskwise.pro'}</span>
                       </div>
 
                       <div className="flex justify-between items-center pb-2 border-b border-slate-850/60 font-sans">
