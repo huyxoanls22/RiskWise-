@@ -212,6 +212,36 @@ export default function App() {
     localStorage.setItem('trading_is_premium', String(isPremium));
   }, [isPremium]);
 
+  // User Theme and Layout personalization states
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      const persisted = localStorage.getItem('trading_theme');
+      if (['dark', 'light'].includes(persisted || '')) {
+        return persisted as any;
+      }
+    } catch {}
+    return 'dark';
+  });
+
+  const [layout, setLayout] = useState<'standard' | 'swapped' | 'compact' | 'terminal'>(() => {
+    try {
+      const persisted = localStorage.getItem('trading_layout');
+      if (['standard', 'swapped', 'compact', 'terminal'].includes(persisted || '')) {
+        return persisted as any;
+      }
+    } catch {}
+    return 'standard';
+  });
+
+  // Sync personalization options
+  useEffect(() => {
+    localStorage.setItem('trading_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('trading_layout', layout);
+  }, [layout]);
+
   // Track the premium license expiry date format
   const [premiumExpiry, setPremiumExpiry] = useState<string>(() => {
     try {
@@ -1495,7 +1525,7 @@ export default function App() {
   const requiredMargin = result.notionalValue / leverage;
 
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-slate-200 font-sans antialiased selection:bg-indigo-950 selection:text-indigo-300 flex flex-col pb-0">
+    <div className={`min-h-screen bg-[#0B0E14] text-slate-200 font-sans antialiased selection:bg-indigo-950 selection:text-indigo-300 flex flex-col pb-0 theme-customized theme-${theme}`}>
       {/* Top clean header */}
       <header className="border-b border-slate-800/80 bg-[#0B0E14] sticky top-0 z-50">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -1648,58 +1678,93 @@ export default function App() {
       </header>
 
 
-      {/* Primary Tab Navigation */}
+      {/* Primary Tab Navigation & Personalization Controls */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 w-full">
-        <div className="flex border-b border-slate-800 gap-1 overflow-x-auto pb-px scrollbar-none">
-          <button
-            onClick={() => setActiveTab('calculator')}
-            className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
-              activeTab === 'calculator'
-                ? 'border-indigo-500 text-white bg-[#14171F]/50 rounded-t-xl'
-                : 'border-transparent text-slate-450'
-            }`}
-          >
-            <Calculator className="w-4 h-4 text-indigo-400" />
-            Tính Toán Vị Thế
-          </button>
-          
-          <button
-            onClick={() => {
-              setActiveTab('portfolio');
-            }}
-            className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
-              activeTab === 'portfolio'
-                ? 'border-emerald-500 text-white bg-[#14171F]/50 rounded-t-xl'
-                : 'border-transparent text-slate-450'
-            }`}
-          >
-            <Briefcase className="w-4 h-4 text-emerald-400" />
-            Quản Lý Rủi Ro
-            {activeTrades.length > 0 && (
-              <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full font-mono">
-                {activeTrades.length}
-              </span>
-            )}
-          </button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-800/80 pb-2.5 md:pb-0 gap-3.5">
+          <div className="flex gap-1 overflow-x-auto pb-px scrollbar-none w-full md:w-auto">
+            <button
+              onClick={() => setActiveTab('calculator')}
+              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
+                activeTab === 'calculator'
+                  ? 'border-indigo-500 text-white bg-[#14171F]/50 rounded-t-xl'
+                  : 'border-transparent text-slate-455'
+              }`}
+            >
+              <Calculator className="w-4 h-4 text-indigo-400" />
+              Tính Toán Vị Thế
+            </button>
+            
+            <button
+              onClick={() => {
+                setActiveTab('portfolio');
+              }}
+              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
+                activeTab === 'portfolio'
+                  ? 'border-emerald-500 text-white bg-[#14171F]/50 rounded-t-xl'
+                  : 'border-transparent text-slate-455'
+              }`}
+            >
+              <Briefcase className="w-4 h-4 text-emerald-400" />
+              Quản Lý Rủi Ro
+              {activeTrades.length > 0 && (
+                <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full font-mono">
+                  {activeTrades.length}
+                </span>
+              )}
+            </button>
 
-          <button
-            onClick={() => {
-              setActiveTab('plans');
-            }}
-            className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
-              activeTab === 'plans'
-                ? 'border-yellow-500 text-white bg-[#14171F]/50 rounded-t-xl'
-                : 'border-transparent text-slate-450'
-            }`}
-          >
-            <FileText className="w-4 h-4 text-yellow-500" />
-            Kế Hoạch Giao Dịch
-            {plans.length > 0 && (
-              <span className="bg-slate-800 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded-full font-mono">
-                {plans.length}
-              </span>
-            )}
-          </button>
+            <button
+              onClick={() => {
+                setActiveTab('plans');
+              }}
+              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
+                activeTab === 'plans'
+                  ? 'border-yellow-500 text-white bg-[#14171F]/50 rounded-t-xl'
+                  : 'border-transparent text-slate-450'
+              }`}
+            >
+              <FileText className="w-4 h-4 text-yellow-500" />
+              Kế Hoạch Giao Dịch
+              {plans.length > 0 && (
+                <span className="bg-slate-800 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded-full font-mono">
+                  {plans.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* User personalization panel (Theme + Layout options) */}
+          <div className="flex flex-wrap items-center gap-3 text-xs justify-end">
+            {/* Theme Selector */}
+            <div className="flex items-center gap-2 bg-[#14171F] px-3 py-1.5 rounded-xl border border-slate-800 shadow-xs">
+              <span className="text-slate-450 font-bold hidden xs:inline uppercase text-[9px] tracking-wide">Màu sắc:</span>
+              <select
+                id="select-app-theme"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as any)}
+                className="bg-transparent text-slate-200 font-bold focus:outline-hidden cursor-pointer text-xs pr-1"
+              >
+                <option value="dark">🌑 Giao diện Tối (Premium)</option>
+                <option value="light">☀️ Giao diện Sáng (Ivory)</option>
+              </select>
+            </div>
+
+            {/* Layout Selector */}
+            <div className="flex items-center gap-2 bg-[#14171F] px-3 py-1.5 rounded-xl border border-slate-800 shadow-xs">
+              <span className="text-slate-450 font-bold hidden xs:inline uppercase text-[9px] tracking-wide">Bố cục:</span>
+              <select
+                id="select-app-layout"
+                value={layout}
+                onChange={(e) => setLayout(e.target.value as any)}
+                className="bg-transparent text-slate-200 font-bold focus:outline-hidden cursor-pointer text-xs pr-1"
+              >
+                <option value="standard">🔲 Lưới chuẩn (Nhập trái, Chart phải)</option>
+                <option value="swapped">🔁 Hoán đổi (Chart trái, Nhập phải)</option>
+                <option value="terminal">🖥️ Terminal Pro (Chart siêu rộng)</option>
+                <option value="compact">🔍 Tối giản (Chỉ tính toán rủi ro)</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1712,10 +1777,26 @@ export default function App() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-6"
+              className={
+                layout === 'compact'
+                  ? "max-w-2xl mx-auto space-y-6 pb-6"
+                  : "grid grid-cols-1 lg:grid-cols-12 gap-6 pb-6"
+              }
             >
-              {/* Column 1: Core Inputs & Checklist (Span 5) */}
-              <div className="lg:col-span-5 space-y-6">
+              {/* Column 1: Core Inputs & Checklist */}
+              <div className={
+                layout === 'compact'
+                  ? "space-y-6"
+                  : `space-y-6 ${
+                      layout === 'terminal' 
+                        ? 'lg:col-span-4' 
+                        : 'lg:col-span-5'
+                    } ${
+                      layout === 'swapped' 
+                        ? 'lg:order-last' 
+                        : ''
+                    }`
+              }>
                 {/* Pre-Trade Checklist (Placed on top for maximum priority) */}
                 <PreTradeChecklist
                   items={checklist}
@@ -1966,13 +2047,27 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Column 2: Chart & Results Dashboard (Span 7) */}
-              <div className="lg:col-span-7 space-y-6">
+              {/* Column 2: Chart & Results Dashboard */}
+              <div className={
+                layout === 'compact'
+                  ? "space-y-6"
+                  : `space-y-6 ${
+                      layout === 'terminal' 
+                        ? 'lg:col-span-8' 
+                        : 'lg:col-span-7'
+                    } ${
+                      layout === 'swapped' 
+                        ? 'lg:order-first' 
+                        : ''
+                    }`
+              }>
                 {/* TradingView Live Chart widget */}
-                <TradingViewWidget
-                  setup={setup}
-                  onApplyLivePrice={(price) => setSetup(prev => ({ ...prev, entryPrice: price }))}
-                />
+                {layout !== 'compact' && (
+                  <TradingViewWidget
+                    setup={setup}
+                    onApplyLivePrice={(price) => setSetup(prev => ({ ...prev, entryPrice: price }))}
+                  />
+                )}
 
                 {/* Grid container for Results side-by-side with RiskMeter and Affiliate */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-fadeIn">

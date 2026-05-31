@@ -9,3 +9,156 @@ html, body, #root {
   display: flex;
   flex-direction: column;
 }
+
+/* Color themes defining variables */
+:root, .theme-dark {
+  --bg-app: #0B0E14;
+  --bg-card: #14171F;
+  --bg-light: #1C212D;
+  --border-app: rgba(30, 41, 59, 0.82);
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent-color: 99, 102, 241; /* indigo-500 */
+  --accent-light: 224, 231, 255;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+}
+
+.theme-light {
+  --bg-app: #f7f6f0;
+  --bg-card: #ffffff;
+  --bg-light: #ebeae1;
+  --border-app: #dad9cc;
+  --text-main: #2b2921;
+  --text-muted: #6e6b5d;
+  --accent-color: 79, 70, 229; /* indigo-600 */
+  --accent-light: 238, 242, 255;
+  --accent-glow: rgba(79, 70, 229, 0.1);
+}
+
+/* Custom global container triggers */
+.theme-customized {
+  background-color: var(--bg-app) !important;
+  color: var(--text-main) !important;
+}
+
+/* Base components background changes */
+.theme-customized header {
+  background-color: var(--bg-app) !important;
+  border-color: var(--border-app) !important;
+}
+.theme-customized .bg-\[\#0B0E14\] {
+  background-color: var(--bg-app) !important;
+}
+.theme-customized .bg-\[\#14171F\] {
+  background-color: var(--bg-card) !important;
+}
+.theme-customized .bg-\[\#1C212D\] {
+  background-color: var(--bg-light) !important;
+}
+.theme-customized .border-slate-800 {
+  border-color: var(--border-app) !important;
+}
+.theme-customized .border-slate-800\/80 {
+  border-color: var(--border-app) !important;
+}
+.theme-customized .border-slate-700 {
+  border-color: var(--border-app) !important;
+}
+.theme-customized .border-slate-850 {
+  border-color: var(--border-app) !important;
+}
+
+/* Accent overrides */
+.theme-customized .text-indigo-400 {
+  color: rgb(var(--accent-color)) !important;
+}
+.theme-customized .text-indigo-300 {
+  color: rgb(var(--accent-color)) !important;
+}
+.theme-customized .bg-indigo-600 {
+  background-color: rgb(var(--accent-color)) !important;
+}
+.theme-customized .bg-indigo-950\/20 {
+  background-color: var(--accent-glow) !important;
+  border-color: var(--border-app) !important;
+}
+.theme-customized .text-indigo-100 {
+  color: #ffffff !important;
+}
+.theme-customized .border-indigo-500 {
+  border-color: rgb(var(--accent-color)) !important;
+}
+.theme-customized .from-indigo-650 {
+  --tw-gradient-from: rgb(var(--accent-color)) var(--tw-gradient-from-position) !important;
+}
+.theme-customized .to-indigo-550 {
+  --tw-gradient-to: rgb(var(--accent-color)) var(--tw-gradient-to-position) !important;
+}
+
+/* Specific Light Theme fixes to maintain professional readability */
+.theme-light .text-slate-100,
+.theme-light .text-white {
+  color: var(--text-main) !important;
+}
+.theme-light .text-slate-200 {
+  color: var(--text-main) !important;
+}
+.theme-light .text-slate-400,
+.theme-light .text-slate-450,
+.theme-light .text-slate-455 {
+  color: var(--text-muted) !important;
+}
+.theme-light input {
+  color: var(--text-main) !important;
+  background-color: var(--bg-light) !important;
+}
+.theme-light select {
+  color: var(--text-main) !important;
+}
+.theme-light select option {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+}
+.theme-light .text-slate-300 {
+  color: var(--text-main) !important;
+}
+.theme-light .bg-indigo-950\/30 {
+  background-color: var(--bg-light) !important;
+  color: rgb(var(--accent-color)) !important;
+}
+.theme-light .text-slate-250 {
+  color: var(--text-main) !important;
+}
+
+/* Checklist items and Alert high-contrast colors in Light Theme */
+.theme-light .bg-amber-950\/20,
+.theme-light .bg-amber-950\/40 {
+  background-color: #fef3c7 !important; /* amber-100 */
+}
+.theme-light .border-amber-900\/40 {
+  border-color: #f59e0b !important; /* amber-500 */
+}
+.theme-light .text-amber-400 {
+  color: #b45309 !important; /* amber-700 / dark amber */
+}
+
+.theme-light .bg-emerald-950\/20,
+.theme-light .bg-emerald-950\/40 {
+  background-color: #d1fae5 !important; /* emerald-100 */
+}
+.theme-light .border-emerald-900\/40 {
+  border-color: #10b981 !important; /* emerald-500 */
+}
+.theme-light .text-emerald-400 {
+  color: #047857 !important; /* emerald-700 / dark emerald */
+}
+
+.theme-light .bg-rose-950\/40 {
+  background-color: #ffe4e6 !important; /* rose-100 */
+}
+.theme-light .border-rose-900\/40 {
+  border-color: #f43f5e !important; /* rose-500 */
+}
+.theme-light .text-rose-400 {
+  color: #be123c !important; /* rose-700 / dark rose */
+}
