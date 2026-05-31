@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AssetClass, TradeSetup, CalculationResult, ChecklistItem, PortfolioTrade, TradingPlan, DailyLimitLog } from './types';
 import { calculatePositionSize, FOREX_PAIRS } from './utils/calculator';
+import { validateAndSanitizeImport, sanitizeInput } from './utils/security';
 import ForexCalculator from './components/ForexCalculator';
 import CryptoStockCalculator from './components/CryptoStockCalculator';
 import RiskMeter from './components/RiskMeter';
@@ -597,10 +598,17 @@ export default function App() {
         const resultText = e.target?.result;
         if (typeof resultText !== 'string') return;
         
-        const parsedData = JSON.parse(resultText);
+        let parsedRaw;
+        try {
+          parsedRaw = JSON.parse(resultText);
+        } catch (jsonErr) {
+          throw new Error('Định dạng file không phải JSON hợp lệ.');
+        }
+
+        const parsedData = validateAndSanitizeImport(parsedRaw);
         
         if (parsedData && typeof parsedData === 'object') {
-          if (parsedData.current_tradesetup) {
+          if (parsedData.current_tradesetup !== undefined) {
             localStorage.setItem('current_tradesetup', JSON.stringify(parsedData.current_tradesetup));
             setSetup(parsedData.current_tradesetup);
           }
@@ -629,13 +637,13 @@ export default function App() {
             setDailyDisciplineLogs(parsedData.trading_daily_discipline_logs);
           }
 
-          alert("Khôi phục dữ liệu thành công! Ứng dụng sẽ tự động tải lại để cập nhật.");
+          alert("Khôi phục và làm sạch dữ liệu thành công! Ứng dụng sẽ tự động tải lại để cập nhật.");
           window.location.reload();
         } else {
-          alert("File JSON khôi phục không đúng định dạng backup.");
+          alert("File JSON khôi phục không hợp lệ.");
         }
-      } catch (error) {
-        alert("Lỗi khi khôi phục dữ liệu, vui lòng kiểm tra lại file của bạn.");
+      } catch (error: any) {
+        alert(error.message || "Lỗi khi khôi phục dữ liệu, vui lòng kiểm tra lại file của bạn.");
         console.error(error);
       }
     };
@@ -1014,7 +1022,7 @@ export default function App() {
     const toSave: TradeSetup = {
       ...setup,
       id: generateUniqueId(),
-      name: name,
+      name: sanitizeInput(name),
       createdAt: new Date().toISOString()
     };
     setSavedList(prev => [toSave, ...prev]);
@@ -1030,7 +1038,7 @@ export default function App() {
   const handleAddChecklistItem = (text: string, isRequired: boolean) => {
     const newItem: ChecklistItem = {
       id: generateUniqueId(),
-      text,
+      text: sanitizeInput(text),
       isChecked: false,
       isRequired
     };
@@ -1441,6 +1449,10 @@ export default function App() {
   const handleAddPlan = (newPlan: Omit<TradingPlan, 'id' | 'createdAt'>) => {
     const toSave: TradingPlan = {
       ...newPlan,
+      title: sanitizeInput(newPlan.title),
+      ticker: sanitizeInput(newPlan.ticker),
+      notes: sanitizeInput(newPlan.notes),
+      timeframe: sanitizeInput(newPlan.timeframe),
       id: generateUniqueId(),
       createdAt: new Date().toISOString()
     };
