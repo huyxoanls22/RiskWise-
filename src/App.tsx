@@ -373,6 +373,8 @@ export default function App() {
       } catch (e) {
         console.error("Error confirming local license state:", e);
       }
+
+
     };
 
     validateTimeAndLicense();
@@ -396,8 +398,8 @@ export default function App() {
     if (key.startsWith("RW-MTH-")) {
       return {
         plan: 'monthly' as const,
-        originalPrice: 89000,
-        finalPrice: 89000,
+        originalPrice: 199000,
+        finalPrice: 199000,
         discountText: "",
         hasDiscount: false,
         label: "Gói Tháng Tiêu Chuẩn"
@@ -405,8 +407,8 @@ export default function App() {
     } else if (key.startsWith("RW-YEAR-")) {
       return {
         plan: 'yearly' as const,
-        originalPrice: 828000,
-        finalPrice: 828000,
+        originalPrice: 999000,
+        finalPrice: 999000,
         discountText: "",
         hasDiscount: false,
         label: "Gói Năm Tiêu Chuẩn"
@@ -414,8 +416,8 @@ export default function App() {
     } else if (key.startsWith("RW5-MTH-")) {
       return {
         plan: 'monthly' as const,
-        originalPrice: 89000,
-        finalPrice: 84550,
+        originalPrice: 199000,
+        finalPrice: 189050,
         discountText: "✓ Đã áp dụng ưu đãi giảm bớt 5%",
         hasDiscount: true,
         label: "Gói Tháng Ưu Đãi 5%"
@@ -423,8 +425,8 @@ export default function App() {
     } else if (key.startsWith("RW10-YEAR-")) {
       return {
         plan: 'yearly' as const,
-        originalPrice: 828000,
-        finalPrice: 745200,
+        originalPrice: 999000,
+        finalPrice: 899100,
         discountText: "✓ Đã áp dụng ưu đãi giảm giá 10%",
         hasDiscount: true,
         label: "Gói Năm Ưu Đãi 10%"
@@ -434,8 +436,8 @@ export default function App() {
     // Default fallback to user-selected paywallPlan
     return {
       plan: paywallPlan,
-      originalPrice: paywallPlan === 'monthly' ? 89000 : 828000,
-      finalPrice: paywallPlan === 'monthly' ? 89000 : 828000,
+      originalPrice: paywallPlan === 'monthly' ? 199000 : 999000,
+      finalPrice: paywallPlan === 'monthly' ? 199000 : 999000,
       discountText: "",
       hasDiscount: false,
       label: paywallPlan === 'monthly' ? "Gói Tháng Tiêu Chuẩn" : "Gói Năm VIP"
@@ -1268,12 +1270,7 @@ export default function App() {
       return updated;
     });
 
-    // Increment and persist total lifetime trade activation count
-    setTotalTradesActivated(prev => {
-      const nextVal = prev + 1;
-      localStorage.setItem('total_trades_activated', String(nextVal));
-      return nextVal;
-    });
+
 
     setShowWarningModal(false);
     setShowDailyLimitModal(false);
@@ -2591,14 +2588,7 @@ export default function App() {
                             MỞ KHÓA PREMIUM PRO 👑
                           </h3>
                           <p className="text-slate-400 text-xs mt-1 font-sans leading-relaxed">
-                            {totalTradesActivated > 50 ? (
-                              <span className="text-amber-400 font-bold">
-                                Bạn đã tích lũy {totalTradesActivated} lượt lưu lệnh (Hạn mức Free: 50).
-                              </span>
-                            ) : (
-                              <span>Hạn mức lưu lệnh tích lũy: {totalTradesActivated}/50.</span>
-                            )}{' '}
-                            Hãy nâng cấp để mở khóa toàn bộ tính năng giám sát vị thế trọn đời.
+                            Hãy nâng cấp lên Premium Pro để mở khóa toàn bộ các chỉ số phân tích hiệu suất chuyên sâu và tâm lý giao dịch nâng cao.
                           </p>
                         </div>
 
@@ -2620,7 +2610,7 @@ export default function App() {
                           >
                             <div>
                               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-sans">Gói Tháng</div>
-                              <div className="font-mono text-base sm:text-lg font-black text-slate-200 mt-1 font-sans">89.000 VNĐ</div>
+                              <div className="font-mono text-base sm:text-lg font-black text-slate-200 mt-1 font-sans">199.000 VNĐ</div>
                               <p className="text-[10px] text-slate-400 mt-1 leading-normal font-medium font-sans">Phù hợp trải nghiệm ngắn hạn, gia hạn hàng tháng.</p>
                             </div>
                           </div>
@@ -2640,7 +2630,7 @@ export default function App() {
                             }`}
                           >
                             <span className="absolute -top-2 left-3 px-2 py-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-[8px] font-black uppercase rounded tracking-wider shadow-sm font-sans">
-                              TIẾT KIỆM 22%
+                              TIẾT KIỆM 58%
                             </span>
 
                             <div>
@@ -2648,9 +2638,9 @@ export default function App() {
                                 <Sparkles className="w-3 h-3 text-amber-400 shrink-0 font-sans" />
                                 Gói Năm VIP
                               </div>
-                              <div className="font-mono text-base sm:text-lg font-black text-amber-400 mt-1 font-sans">828.000 VNĐ</div>
+                              <div className="font-mono text-base sm:text-lg font-black text-amber-400 mt-1 font-sans">999.000 VNĐ</div>
                               <p className="text-[10px] text-slate-350 leading-none mt-1 font-semibold font-sans">
-                                (chỉ 69.000 VNĐ/ tháng) tiết kiệm ngay 22%
+                                (chỉ 83.250 VNĐ/ tháng) tiết kiệm ngay 58%
                               </p>
                             </div>
                           </div>

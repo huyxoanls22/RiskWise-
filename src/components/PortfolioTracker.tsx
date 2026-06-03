@@ -88,7 +88,7 @@ export default function PortfolioTracker({
   const [resetPhraseInput, setResetPhraseInput] = useState('');
   const [equityRange, setEquityRange] = useState<'30days' | 'all'>('30days');
 
-  const isLocked = (!isPremium && (totalTradesActivated || 0) > 50) || isOfflineTimeHack;
+  const isLocked = isOfflineTimeHack;
   const isProLocked = !isPremium || isOfflineTimeHack;
 
   // Dynamically recalculate dailyLimitLogs based on current accountBalance and dailyLimitPercent
@@ -124,7 +124,7 @@ export default function PortfolioTracker({
 
   // Equity Curve data preparation
   const getEquityData = (range: '30days' | 'all') => {
-    const isLockedAndLimitActive = (!isPremium && (totalTradesActivated || 0) > 50) || isOfflineTimeHack;
+    const isLockedAndLimitActive = !isPremium || isOfflineTimeHack;
     const refDate = currentTime || new Date();
     const limitMs = refDate.getTime() - 30 * 24 * 60 * 60 * 1000;
     
@@ -754,7 +754,7 @@ export default function PortfolioTracker({
               <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2 flex-wrap">
                 <TrendingUp className="w-4 h-4 text-indigo-400" />
                 Đường Cong Vốn (Equity Curve) &amp; Biến Động Số Dư
-                {((!isPremium && (totalTradesActivated || 0) > 50) || isOfflineTimeHack) && (
+                {(!isPremium || isOfflineTimeHack) && (
                   <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-500 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider scale-95 origin-left">
                     Chỉ số 30 ngày (Free Tier)
                   </span>
