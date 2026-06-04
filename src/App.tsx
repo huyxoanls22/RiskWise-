@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AssetClass, TradeSetup, CalculationResult, ChecklistItem, PortfolioTrade, TradingPlan, DailyLimitLog } from './types';
-import { calculatePositionSize, FOREX_PAIRS } from './utils/calculator';
+import { calculatePositionSize, FOREX_PAIRS, DEFAULT_FOREX_PRICES } from './utils/calculator';
 import { validateAndSanitizeImport, sanitizeInput } from './utils/security';
 import ForexCalculator from './components/ForexCalculator';
 import CryptoStockCalculator from './components/CryptoStockCalculator';
@@ -1029,7 +1029,26 @@ export default function App() {
       if (nameChanged || forexChanged) {
         setChecklist(current => current.map(item => ({ ...item, isChecked: false })));
       }
-      return { ...prev, ...updater };
+
+      let nextEntryPrice = updater.entryPrice !== undefined ? updater.entryPrice : prev.entryPrice;
+
+      // Handle asset class transitions for helpful defaults
+      if (updater.assetClass === 'forex' && prev.assetClass !== 'forex') {
+        const pair = updater.forexPair || prev.forexPair || 'EUR/USD';
+        nextEntryPrice = DEFAULT_FOREX_PRICES[pair] || 1.0852;
+      } else if (updater.assetClass === 'crypto_stock' && prev.assetClass !== 'crypto_stock') {
+        const prevPair = prev.forexPair || 'EUR/USD';
+        const defaultPrevPrice = DEFAULT_FOREX_PRICES[prevPair] || 1.0852;
+        if (prev.entryPrice === defaultPrevPrice) {
+          nextEntryPrice = 100;
+        }
+      }
+
+      return { 
+        ...prev, 
+        ...updater,
+        entryPrice: nextEntryPrice
+      };
     });
   };
 
@@ -1183,20 +1202,7 @@ export default function App() {
       stopLossStr = `${setup.stopLossPips} pips (SL)`;
       trSector = 'Forex / Ngoại hối';
       
-      const defaultPriceMap: { [key: string]: number } = {
-        'EUR/USD': 1.0852,
-        'GBP/USD': 1.2684,
-        'AUD/USD': 0.6612,
-        'NZD/USD': 0.6124,
-        'USD/JPY': 156.45,
-        'USD/CAD': 1.3650,
-        'USD/CHF': 0.9080,
-        'EUR/GBP': 0.8550,
-        'EUR/JPY': 169.80,
-        'GBP/JPY': 198.50,
-        'BTC/USD (Crypto Lot)': 68420.0
-      };
-      entryPr = defaultPriceMap[ticker] || 1.0000;
+      entryPr = setup.entryPrice !== undefined ? setup.entryPrice : (DEFAULT_FOREX_PRICES[ticker] || 1.0852);
     } else {
       ticker = setup.name ? setup.name.toUpperCase().replace(/\s+/g, '') : 'CRYPTO_STOCK';
       entryPr = setup.entryPrice || 100;

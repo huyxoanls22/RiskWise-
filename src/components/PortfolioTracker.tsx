@@ -1488,18 +1488,12 @@ export default function PortfolioTracker({
 
                       {/* Actions: close choices */}
                       <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end">
                           <button
-                            onClick={() => onCloseTrade(t.id, 'won')}
-                            className="bg-emerald-900/50 text-emerald-300 hover:bg-emerald-800/60 px-2 py-1 text-[10px] rounded-lg border border-emerald-850 cursor-pointer font-extrabold transition"
+                            onClick={() => onCloseTrade(t.id, t.pnl >= 0 ? 'won' : 'lost')}
+                            className="bg-[#1C212D] border border-slate-700 hover:border-slate-500 text-slate-205 hover:text-white px-3 py-1.5 text-[10px] rounded-lg cursor-pointer font-extrabold transition-all uppercase tracking-wider"
                           >
-                            ✓ WIN
-                          </button>
-                          <button
-                            onClick={() => onCloseTrade(t.id, 'lost')}
-                            className="bg-rose-900/50 text-rose-300 hover:bg-rose-800/60 px-2 py-1 text-[10px] rounded-lg border border-rose-850 cursor-pointer font-extrabold transition"
-                          >
-                            ✕ LOSS
+                            Đóng vị thế
                           </button>
                         </div>
                       </td>

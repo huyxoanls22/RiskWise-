@@ -1,6 +1,6 @@
 import React from 'react';
 import { ForexPairConfig, TradeSetup } from '../types';
-import { FOREX_PAIRS } from '../utils/calculator';
+import { FOREX_PAIRS, DEFAULT_FOREX_PRICES } from '../utils/calculator';
 import { Info, HelpCircle } from 'lucide-react';
 
 interface ForexCalculatorProps {
@@ -19,7 +19,13 @@ export default function ForexCalculator({ setup, onChangeSetup }: ForexCalculato
       forexPair: symbol,
       // reset custom pip value to the selected pair's default when pair is updated
       pipValueUSD: pair.defaultPipValueUSD,
+      entryPrice: DEFAULT_FOREX_PRICES[symbol] || 1.0852,
     });
+  };
+
+  const handleNumChange = (field: keyof TradeSetup, value: string) => {
+    const parsed = value === '' ? undefined : Math.max(0, parseFloat(value) || 0);
+    onChangeSetup({ [field]: parsed });
   };
 
   return (
@@ -44,6 +50,23 @@ export default function ForexCalculator({ setup, onChangeSetup }: ForexCalculato
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Entry Price */}
+      <div>
+        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+          Giá Điểm Vào (Entry Price)
+        </label>
+        <input
+          id="input-forex-entry-price"
+          type="number"
+          step="any"
+          min="0"
+          value={setup.entryPrice !== undefined ? setup.entryPrice : ''}
+          onChange={(e) => handleNumChange('entryPrice', e.target.value)}
+          placeholder={`VD: ${DEFAULT_FOREX_PRICES[selectedPairSymbol] || '1.0852'}`}
+          className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-600 font-mono text-xs font-semibold text-white px-3.5 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition-colors"
+        />
       </div>
 
       {/* Stop Loss Pips */}

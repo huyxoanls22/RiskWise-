@@ -51,6 +51,44 @@ export const FOREX_PAIRS: ForexPairConfig[] = [
   { symbol: 'XAG/USD (Silver)', pipSize: 0.01, standardLotUnits: 5000, defaultPipValueUSD: 50.0 },
 ];
 
+export const DEFAULT_FOREX_PRICES: { [key: string]: number } = {
+  'EUR/USD': 1.0852,
+  'GBP/USD': 1.2684,
+  'AUD/USD': 0.6612,
+  'NZD/USD': 0.6124,
+  'USD/JPY': 156.45,
+  'USD/CAD': 1.3650,
+  'USD/CHF': 0.9080,
+  'EUR/GBP': 0.8550,
+  'EUR/JPY': 169.80,
+  'GBP/JPY': 198.50,
+  'EUR/AUD': 1.6420,
+  'EUR/CAD': 1.4810,
+  'EUR/CHF': 0.9760,
+  'EUR/NZD': 1.7750,
+  'GBP/AUD': 1.9180,
+  'GBP/CAD': 1.7320,
+  'GBP/CHF': 1.1410,
+  'GBP/NZD': 2.0710,
+  'AUD/JPY': 103.45,
+  'AUD/CAD': 0.9020,
+  'AUD/CHF': 0.6000,
+  'AUD/NZD': 1.0790,
+  'NZD/JPY': 95.80,
+  'NZD/CAD': 0.8350,
+  'NZD/CHF': 0.5565,
+  'CAD/JPY': 114.60,
+  'CAD/CHF': 0.6650,
+  'CHF/JPY': 172.30,
+  'USD/SGD': 1.3480,
+  'USD/HKD': 7.8120,
+  'USD/MXN': 17.6500,
+  'USD/ZAR': 18.5200,
+  'USD/TRY': 32.2500,
+  'XAU/USD (Gold)': 2335.50,
+  'XAG/USD (Silver)': 29.45,
+};
+
 export function calculatePositionSize(setup: TradeSetup): CalculationResult {
   // 1. Calculate risk amount in cash (USD or active currency)
   let riskAmount = 0;
