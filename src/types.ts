@@ -16,6 +16,7 @@ export interface TradeSetup {
   accountCurrency: string;
   riskType: 'percentage' | 'amount';
   riskValue: number; // either % (like 2%) or absolute cash amount (like 200)
+  emotion?: 'Bình tĩnh' | 'Hưng phấn' | 'Sợ hãi' | 'FOMO' | 'Cay cú/Trả thù';
   
   // Forex spec
   forexPair?: string;
@@ -50,6 +51,12 @@ export interface ChecklistItem {
   isRequired: boolean; // if true, entering trade without it prompts alert
 }
 
+export interface ChecklistProfile {
+  id: string;
+  title: string;
+  items: ChecklistItem[];
+}
+
 export interface PortfolioTrade {
   id: string;
   ticker: string;
@@ -71,6 +78,7 @@ export interface PortfolioTrade {
   notes?: string;
   sector?: string;
   setup?: string;
+  emotion?: 'Bình tĩnh' | 'Hưng phấn' | 'Sợ hãi' | 'FOMO' | 'Cay cú/Trả thù';
 }
 
 export interface TradingPlan {

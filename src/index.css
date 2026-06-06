@@ -119,15 +119,29 @@ html, body, #root {
   background-color: var(--bg-card) !important;
   color: var(--text-main) !important;
 }
-.theme-light .text-slate-300 {
-  color: var(--text-main) !important;
-}
-.theme-light .bg-indigo-950\/30 {
-  background-color: var(--bg-light) !important;
-  color: rgb(var(--accent-color)) !important;
+.theme-light .text-slate-300,
+.theme-light .text-slate-350,
+.theme-light .text-slate-500,
+.theme-light .text-slate-550,
+.theme-light .text-slate-600,
+.theme-light .text-slate-605,
+.theme-light .text-slate-650,
+.theme-light .text-slate-655 {
+  color: var(--text-muted) !important;
 }
 .theme-light .text-slate-250 {
   color: var(--text-main) !important;
+}
+.theme-light .text-violet-400 {
+  color: #6d28d9 !important; /* Deep Violet-700 */
+}
+.theme-light .text-emerald-450,
+.theme-light .text-emerald-455 {
+  color: #047857 !important; /* Deep Emerald-700 */
+}
+.theme-light .text-rose-450,
+.theme-light .text-rose-455 {
+  color: #be123c !important; /* Deep Rose-700 */
 }
 
 /* Checklist items and Alert high-contrast colors in Light Theme */
@@ -162,3 +176,117 @@ html, body, #root {
 .theme-light .text-rose-400 {
   color: #be123c !important; /* rose-700 / dark rose */
 }
+
+/* Support slash-opacity backgrounds for customized theme */
+.theme-customized .bg-\[\#1C212D\]\/60 {
+  background-color: var(--bg-light) !important;
+}
+.theme-customized .bg-\[\#14171F\]\/50,
+.theme-customized .bg-\[\#14171F\]\/80,
+.theme-customized .bg-\[\#14171F\]\/90 {
+  background-color: var(--bg-card) !important;
+}
+
+/* Additional border color overrides */
+.theme-customized .border-slate-800\/60 {
+  border-color: var(--border-app) !important;
+}
+.theme-customized .border-slate-850\/40 {
+  border-color: var(--border-app) !important;
+}
+.theme-customized .border-slate-855 {
+  border-color: var(--border-app) !important;
+}
+
+/* Specific premium high contrast labels in Light Theme */
+.theme-light .text-emerald-440 {
+  color: #047857 !important; /* emerald-700 */
+}
+.theme-light .text-rose-440 {
+  color: #be123c !important; /* rose-700 */
+}
+
+/* Handle alert boxes backgrounds & text colors perfectly in Light Theme */
+.theme-light .bg-rose-950\/20 {
+  background-color: #ffe4e6 !important; /* rose-100 */
+}
+.theme-light .text-rose-200 {
+  color: #be123c !important; /* rose-700 */
+}
+.theme-light .bg-rose-950\/20 .text-slate-300,
+.theme-light .bg-rose-950\/40 .text-slate-300 {
+  color: #9f1239 !important; /* rose-800 */
+}
+
+/* High contrast premium stats overrides for light mode */
+.theme-light .premium-stats-section .bg-\[\#14171F\]\/50,
+.theme-light .premium-stats-section .bg-\[\#14171F\]\/80,
+.theme-light .premium-stats-section .bg-\[\#14171F\]\/90 {
+  background-color: #f1f3f5 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .premium-stats-section .text-slate-500,
+.theme-light .premium-stats-section .text-slate-550 {
+  color: #2b2921 !important; /* extreme crisp dark */
+  font-weight: 600 !important;
+}
+
+.theme-light .premium-stats-section .text-slate-200 {
+  color: #2b2921 !important; /* extreme crisp dark */
+  font-weight: 700 !important;
+}
+
+.theme-light .premium-stats-section .text-slate-300 {
+  color: #2b2921 !important; /* extreme crisp dark */
+  font-weight: 600 !important;
+}
+
+.theme-light .premium-stats-section .text-slate-350 {
+  color: #374151 !important;
+  font-weight: 600 !important;
+}
+
+.theme-light .premium-stats-section .text-slate-450,
+.theme-light .premium-stats-section .text-slate-455 {
+  color: #4b5563 !important;
+}
+
+.theme-light .premium-stats-section .bg-rose-955\/20 {
+  background-color: #ffe4e6 !important;
+  border-color: #fca5a5 !important;
+}
+
+.theme-light .premium-stats-section .text-rose-300,
+.theme-light .premium-stats-section .text-rose-400 {
+  color: #b91c1c !important;
+  font-weight: 800 !important;
+}
+
+.theme-light .premium-stats-section .text-rose-455 {
+  color: #b91c1c !important;
+  font-weight: 800 !important;
+}
+
+.theme-light .premium-stats-section .text-emerald-400,
+.theme-light .premium-stats-section .text-emerald-455 {
+  color: #047857 !important;
+  font-weight: 800 !important;
+}
+
+.theme-light .premium-stats-section .text-violet-400 {
+  color: #5b21b6 !important;
+  font-weight: 900 !important;
+}
+
+.theme-light .premium-stats-section .bg-rose-950\/20 {
+  background-color: #fef2f2 !important;
+  border-color: #fca5a5 !important;
+}
+
+.theme-light .premium-stats-section .bg-rose-950\/20 p,
+.theme-light .premium-stats-section .bg-rose-950\/20 .text-slate-300 {
+  color: #9f1239 !important;
+  font-weight: 700 !important;
+}
+

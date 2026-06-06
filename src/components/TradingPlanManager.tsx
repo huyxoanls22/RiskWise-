@@ -326,7 +326,7 @@ export default function TradingPlanManager({
                         p.status === 'pending' ? 'bg-[#0B0E14] text-amber-400 font-bold' : 
                         p.status === 'executed' ? 'bg-emerald-950/30 text-emerald-400' : 'bg-slate-800 text-slate-500'
                       }`}>
-                        {p.status === 'pending' ? 'Hờ' : p.status === 'executed' ? 'Đã găm' : 'Hủy'}
+                        {p.status === 'pending' ? 'Chờ' : p.status === 'executed' ? 'Đã khớp' : 'Hủy'}
                       </span>
                     </div>
                   </div>

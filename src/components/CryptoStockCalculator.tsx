@@ -25,7 +25,8 @@ export default function CryptoStockCalculator({ setup, onChangeSetup }: CryptoSt
             id="input-ticker-name"
             type="text"
             value={setup.name || ''}
-            onChange={(e) => onChangeSetup({ name: e.target.value.toUpperCase() })}
+            onChange={(e) => onChangeSetup({ name: e.target.value })}
+            onBlur={(e) => onChangeSetup({ name: e.target.value.toUpperCase() })}
             placeholder="VD: BTC, TSLA"
             className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-600 font-mono text-xs font-bold text-white px-3 py-2.5 rounded-xl focus:outline-hidden focus:border-indigo-500 transition-colors uppercase"
           />

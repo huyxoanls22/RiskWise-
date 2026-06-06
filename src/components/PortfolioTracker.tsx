@@ -89,7 +89,7 @@ export default function PortfolioTracker({
   const [equityRange, setEquityRange] = useState<'30days' | 'all'>('30days');
 
   const isLocked = isOfflineTimeHack;
-  const isProLocked = !isPremium || isOfflineTimeHack;
+  const isProLocked = isOfflineTimeHack;
 
   // Dynamically recalculate dailyLimitLogs based on current accountBalance and dailyLimitPercent
   const mappedDisciplineLogs = useMemo(() => {
@@ -684,20 +684,7 @@ export default function PortfolioTracker({
           <p className="text-[10px] text-slate-450 mt-1">Dựa trên vị thế mở hoạt động.</p>
         </div>
 
-        {/* Realized PnL */}
-        <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative">
-          <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tổng Lời/Lỗ Thực tế</span>
-          <div className="mt-2.5 flex items-baseline gap-1.5">
-            <span className={`text-2xl font-black font-mono tracking-tight ${
-              totalRealizedPnl >= 0 ? 'text-emerald-400' : 'text-rose-500'
-            }`}>
-              {totalRealizedPnl >= 0 ? '+' : ''}${totalRealizedPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-          <p className="text-[10px] text-slate-450 mt-1">Lợi nhuận đã khóa bằng Trailing Stop của vị thế đang mở.</p>
-        </div>
-
-        {/* Win Rate */}
+             {/* Win Rate */}
         <div className="bg-[#14171F] border border-slate-800 rounded-2xl p-4.5 shadow-sm overflow-hidden relative">
           <span className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">Tỉ Lệ Thắng / Avg R:R</span>
           <div className="mt-2.5 flex items-baseline gap-1.5 justify-between">
@@ -734,7 +721,7 @@ export default function PortfolioTracker({
                     }`}>
                       {pct.toFixed(0)}%
                     </span>
-                    <span className="text-[10px] text-slate-500 font-sans">Giao dịch chuẩn</span>
+                    <span className="text-[10px] text-slate-550 font-sans">Giao dịch chuẩn</span>
                   </>
                 );
               })()
@@ -754,9 +741,9 @@ export default function PortfolioTracker({
               <h4 className="text-xs font-black text-slate-100 uppercase tracking-widest flex items-center gap-2 flex-wrap">
                 <TrendingUp className="w-4 h-4 text-indigo-400" />
                 Đường Cong Vốn (Equity Curve) &amp; Biến Động Số Dư
-                {(!isPremium || isOfflineTimeHack) && (
+                {isOfflineTimeHack && (
                   <span className="text-[9px] bg-amber-500/15 border border-amber-500/30 text-amber-500 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider scale-95 origin-left">
-                    Chỉ số 30 ngày (Free Tier)
+                    Chỉ số 30 ngày (Bị giới hạn)
                   </span>
                 )}
               </h4>
@@ -775,7 +762,7 @@ export default function PortfolioTracker({
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  30 Ngày (Free)
+                  30 Ngày
                 </button>
                 <button
                   type="button"
@@ -793,7 +780,7 @@ export default function PortfolioTracker({
                   }`}
                 >
                   {isProLocked && <Lock className="w-2.5 h-2.5 text-amber-500" />}
-                  Trọn Đời (PRO)
+                  Trọn Đời
                 </button>
               </div>
 
@@ -1668,7 +1655,7 @@ export default function PortfolioTracker({
         <div className="flex items-center justify-between pb-2 border-b border-slate-805">
           <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
             <Scale className="w-4 h-4 text-violet-400" />
-            Lịch Sử Kỷ Luật & Chỉ Số Tuân Thủ Daily Limit ({mappedDisciplineLogs.length})
+            Phân Tích Kỷ Luật (Pro Trader) & Chỉ Số Tuân Thủ Daily Limit ({mappedDisciplineLogs.length})
           </h3>
           {onClearDisciplineLogs && mappedDisciplineLogs.length > 0 && (
             <button
@@ -1679,7 +1666,7 @@ export default function PortfolioTracker({
               className="px-3 py-1.5 bg-rose-950/45 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 rounded-xl text-[11px] font-black cursor-pointer transition duration-150 flex items-center gap-1.5 shadow-md shadow-rose-950/20 uppercase tracking-wider"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Reset Lịch Sử Kỷ Luật
+              Reset Phân Tích Kỷ Luật
             </button>
           )}
         </div>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { AssetClass, TradeSetup, CalculationResult, ChecklistItem, PortfolioTrade, TradingPlan, DailyLimitLog } from './types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { AssetClass, TradeSetup, CalculationResult, ChecklistItem, ChecklistProfile, PortfolioTrade, TradingPlan, DailyLimitLog } from './types';
 import { calculatePositionSize, FOREX_PAIRS, DEFAULT_FOREX_PRICES } from './utils/calculator';
 import { validateAndSanitizeImport, sanitizeInput } from './utils/security';
 import ForexCalculator from './components/ForexCalculator';
@@ -9,6 +9,7 @@ import TradeVisualizer from './components/TradeVisualizer';
 import PreTradeChecklist from './components/PreTradeChecklist';
 import TradingPlanManager from './components/TradingPlanManager';
 import PortfolioTracker from './components/PortfolioTracker';
+import TabDisciplineHistory from './components/TabDisciplineHistory';
 import TradingViewWidget, { isVietnameseTicker } from './components/TradingViewWidget';
 import { 
   Calculator, 
@@ -36,7 +37,8 @@ import {
   Crown,
   CreditCard,
   Calendar,
-  X
+  X,
+  Scale
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -64,6 +66,7 @@ const defaultSetup: TradeSetup = {
   entryPrice: 100,
   stopLossPrice: 95,
   takeProfitPrice: 115,
+  emotion: undefined,
   createdAt: ''
 };
 
@@ -105,36 +108,104 @@ export default function App() {
     return [];
   });
 
-  const [activeTab, setActiveTab] = useState<'calculator' | 'portfolio' | 'plans'>(() => {
+  const [activeTab, setActiveTab] = useState<'calculator' | 'portfolio' | 'plans' | 'discipline'>(() => {
     const rawTab = localStorage.getItem('active_tab');
-    if (rawTab === 'calculator' || rawTab === 'portfolio' || rawTab === 'plans') {
+    if (rawTab === 'calculator' || rawTab === 'portfolio' || rawTab === 'plans' || rawTab === 'discipline') {
       return rawTab;
     }
     return 'calculator';
   });
 
-  // Checklist Item State
-  const [checklist, setChecklist] = useState<ChecklistItem[]>(() => {
+  // Checklist Profiles state with automatic backup/restore/migration
+  const [checklistProfiles, setChecklistProfiles] = useState<ChecklistProfile[]>(() => {
     try {
-      const persisted = localStorage.getItem('trading_checklist_items');
-      if (persisted) {
-        const parsed = JSON.parse(persisted);
-        if (Array.isArray(parsed)) {
-          const validated = parsed.filter(item => item && typeof item === 'object' && 'id' in item);
-          if (validated.length > 0) return validated;
+      const persistedProfiles = localStorage.getItem('trading_checklist_profiles_v2');
+      if (persistedProfiles) {
+        const parsed = JSON.parse(persistedProfiles);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
         }
       }
-    } catch (e) {}
-    // Premium defaults
-    return [
-      { id: '1', text: 'Xác định xu hướng lớn đồng thuận (Khung H4/D1)', isChecked: false, isRequired: true },
-      { id: '2', text: 'Giá ở vùng hỗ trợ lớn, kháng cự cứng, hoặc Key level', isChecked: false, isRequired: true },
-      { id: '3', text: 'Tỉ lệ Rủi ro : Lợi nhuận (R:R) tối thiểu đạt 1:2', isChecked: false, isRequired: true },
-      { id: '4', text: 'Xác định cụm nến xác nhận hoặc tín hiệu đảo chiều rõ rệt', isChecked: false, isRequired: true },
-      { id: '5', text: 'Kiểm tra lịch sự kiện kinh tế để chắc chắn không bão tin tức', isChecked: false, isRequired: false },
-      { id: '6', text: 'Mức rủi ro tối đa nằm trong giới hạn kiểm soát vốn (< 2%)', isChecked: false, isRequired: true },
-    ];
+
+      // Check migration from old single checklist
+      const oldItemsPersisted = localStorage.getItem('trading_checklist_items');
+      const oldTitlePersisted = localStorage.getItem('trading_checklist_title') || 'Checklist Trước Vào Lệnh';
+      let migratedItems = [
+        { id: '1', text: 'Xác định xu hướng lớn đồng thuận (Khung H4/D1)', isChecked: false, isRequired: true },
+        { id: '2', text: 'Giá ở vùng hỗ trợ lớn, kháng cự cứng, hoặc Key level', isChecked: false, isRequired: true },
+        { id: '3', text: 'Tỉ lệ Rủi ro : Lợi nhuận (R:R) tối thiểu đạt 1:2', isChecked: false, isRequired: true },
+        { id: '4', text: 'Xác định cụm nến xác nhận hoặc tín hiệu đảo chiều rõ rệt', isChecked: false, isRequired: true },
+        { id: '5', text: 'Kiểm tra lịch sự kiện kinh tế để chắc chắn không bão tin tức', isChecked: false, isRequired: false },
+        { id: '6', text: 'Mức rủi ro tối đa nằm trong giới hạn kiểm soát vốn (< 2%)', isChecked: false, isRequired: true },
+      ];
+      if (oldItemsPersisted) {
+        const parsedOld = JSON.parse(oldItemsPersisted);
+        if (Array.isArray(parsedOld) && parsedOld.length > 0) {
+          migratedItems = parsedOld;
+        }
+      }
+      return [
+        {
+          id: 'default',
+          title: oldTitlePersisted,
+          items: migratedItems
+        }
+      ];
+    } catch (e) {
+      return [
+        {
+          id: 'default',
+          title: 'Checklist Trước Vào Lệnh',
+          items: [
+            { id: '1', text: 'Xác định xu hướng lớn đồng thuận (Khung H4/D1)', isChecked: false, isRequired: true },
+            { id: '2', text: 'Giá ở vùng hỗ trợ lớn, kháng cự cứng, hoặc Key level', isChecked: false, isRequired: true },
+            { id: '3', text: 'Tỉ lệ Rủi ro : Lợi nhuận (R:R) tối thiểu đạt 1:2', isChecked: false, isRequired: true },
+            { id: '4', text: 'Xác định cụm nến xác nhận hoặc tín hiệu đảo chiều rõ rệt', isChecked: false, isRequired: true },
+            { id: '5', text: 'Kiểm tra lịch sự kiện kinh tế để chắc chắn không bão tin tức', isChecked: false, isRequired: false },
+            { id: '6', text: 'Mức rủi ro tối đa nằm trong giới hạn kiểm soát vốn (< 2%)', isChecked: false, isRequired: true },
+          ]
+        }
+      ];
+    }
   });
+
+  const [activeProfileId, setActiveProfileId] = useState<string>(() => {
+    return localStorage.getItem('trading_checklist_active_profile_id') || 'default';
+  });
+
+  const activeProfile = useMemo(() => {
+    return checklistProfiles.find(p => p.id === activeProfileId) || checklistProfiles[0] || { id: 'default', title: 'Checklist Trước Vào Lệnh', items: [] };
+  }, [checklistProfiles, activeProfileId]);
+
+  const checklist = activeProfile.items;
+  const checklistTitle = activeProfile.title;
+
+  const setChecklist = (updater: ChecklistItem[] | ((current: ChecklistItem[]) => ChecklistItem[])) => {
+    setChecklistProfiles(prev => prev.map(p => {
+      if (p.id === activeProfileId) {
+        const nextItems = typeof updater === 'function' ? updater(p.items) : updater;
+        return { ...p, items: nextItems };
+      }
+      return p;
+    }));
+  };
+
+  const setChecklistTitle = (newTitle: string) => {
+    setChecklistProfiles(prev => prev.map(p => {
+      if (p.id === activeProfileId) {
+        return { ...p, title: newTitle };
+      }
+      return p;
+    }));
+  };
+
+  useEffect(() => {
+    localStorage.setItem('trading_checklist_profiles_v2', JSON.stringify(checklistProfiles));
+  }, [checklistProfiles]);
+
+  useEffect(() => {
+    localStorage.setItem('trading_checklist_active_profile_id', activeProfileId);
+  }, [activeProfileId]);
 
   const [showAffiliateDropdown, setShowAffiliateDropdown] = useState(false);
 
@@ -380,6 +451,8 @@ export default function App() {
     validateTimeAndLicense();
   }, []);
 
+
+
   const [showPaywall, setShowPaywall] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [paywallPlan, setPaywallPlan] = useState<'monthly' | 'yearly'>('monthly');
@@ -558,6 +631,14 @@ export default function App() {
 
   const [leverage, setLeverage] = useState<number>(100); // Default 1:100 leverage
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+
+  const showNotification = (message: string, type: 'success' | 'error' | 'warning' = 'warning') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(current => current?.message === message ? null : current);
+    }, 4500);
+  };
 
   // Daily Limit State
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
@@ -614,7 +695,7 @@ export default function App() {
       linkElement.setAttribute('download', exportFileDefaultName);
       linkElement.click();
     } catch (e) {
-      alert("Lỗi khi xuất dữ liệu backup!");
+      showNotification("Lỗi khi xuất dữ liệu backup!", 'error');
       console.error(e);
     }
   };
@@ -669,13 +750,15 @@ export default function App() {
             setDailyDisciplineLogs(parsedData.trading_daily_discipline_logs);
           }
 
-          alert("Khôi phục và làm sạch dữ liệu thành công! Ứng dụng sẽ tự động tải lại để cập nhật.");
-          window.location.reload();
+          showNotification("Khôi phục thành công! Đang tự động tải lại...", 'success');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
         } else {
-          alert("File JSON khôi phục không hợp lệ.");
+          showNotification("File JSON khôi phục không hợp lệ.", 'error');
         }
       } catch (error: any) {
-        alert(error.message || "Lỗi khi khôi phục dữ liệu, vui lòng kiểm tra lại file của bạn.");
+        showNotification(error.message || "Lỗi khi khôi phục dữ liệu, vui lòng kiểm tra lại file của bạn.", 'error');
         console.error(error);
       }
     };
@@ -1100,6 +1183,38 @@ export default function App() {
     setChecklist(prev => prev.filter(item => item.id !== id));
   };
 
+  const handleCreateProfile = (title: string) => {
+    // Check if free user is exceeding their 1-checklist limit
+    if (!isPremium && checklistProfiles.length >= 1) {
+      setShowPaywall(true);
+      return;
+    }
+    const newId = generateUniqueId();
+    const newProfile: ChecklistProfile = {
+      id: newId,
+      title: title,
+      items: [
+        { id: generateUniqueId(), text: 'Điểm cắt lỗ luôn tuân thủ dừng SL', isChecked: false, isRequired: true }
+      ]
+    };
+    setChecklistProfiles(prev => [...prev, newProfile]);
+    setActiveProfileId(newId);
+    showNotification("Đã tạo mới checklist thành công!", "success");
+  };
+
+  const handleDeleteProfile = (id: string) => {
+    if (checklistProfiles.length <= 1) {
+      showNotification("Phải giữ lại tối thiểu một checklist!", "warning");
+      return;
+    }
+    setChecklistProfiles(prev => prev.filter(p => p.id !== id));
+    if (activeProfileId === id) {
+      const remaining = checklistProfiles.filter(p => p.id !== id);
+      setActiveProfileId(remaining[0].id);
+    }
+    showNotification("Đã xóa checklist thành công!", "success");
+  };
+
   // Portfolio Actions
   const getLocalTodayDateStr = () => {
     const d = new Date();
@@ -1136,6 +1251,12 @@ export default function App() {
   };
 
   const handleAttemptLogTrade = () => {
+    // 1. Mandatory Emotion Check
+    if (!setup.emotion) {
+      showNotification("⚠️ LỖI BẮT BUỘC: Bạn chưa chọn 'Trạng Thái Cảm Xúc Lúc Vào Lệnh'! Vui lòng khai báo trung thực trạng thái tâm lý trước khi lưu lệnh.", 'error');
+      return;
+    }
+
     const todayDateStr = getLocalTodayDateStr();
 
     // Sum up risk for all entries logged today in active and closed trades
@@ -1187,7 +1308,7 @@ export default function App() {
     const units = result.positionSizeUnits !== undefined ? result.positionSizeUnits : 0;
     
     if (units <= 0) {
-      alert("Khối lượng vào lệnh bằng 0. Vui lòng thiết lập thông số dừng lỗ hợp lệ trước khi vào lệnh!");
+      showNotification("Khối lượng vào lệnh bằng 0. Vui lòng thiết lập thông số dừng lỗ hợp lệ trước khi vào lệnh!", 'error');
       return;
     }
 
@@ -1236,7 +1357,8 @@ export default function App() {
       status: 'active',
       enteredAt: isoString,
       uncheckedWarning: bypassForce,
-      sector: trSector
+      sector: trSector,
+      emotion: setup.emotion
     };
 
     // Optimistically update local UI state
@@ -1336,7 +1458,8 @@ export default function App() {
     // Optimistically update states
     setClosedTrades(history => {
       if (history.some(t => t.id === id)) return history;
-      return [closed, ...history];
+      const updatedHistory = [closed, ...history];
+      return updatedHistory;
     });
     setActiveTrades(prev => prev.filter(t => t.id !== id));
     
@@ -1681,13 +1804,14 @@ export default function App() {
       </header>
 
 
-      {/* Primary Tab Navigation & Personalization Controls */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 w-full">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-800/80 pb-2.5 md:pb-0 gap-3.5">
-          <div className="flex gap-1 overflow-x-auto pb-px scrollbar-none w-full md:w-auto">
+      {/* Primary Tab Navigation & Personalization Controls (Sticky) */}
+      <div className="sticky top-[64px] z-40 bg-[#0B0E14] border-b border-slate-800 py-3 w-full transition duration-150 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-2.5 md:pb-0 gap-3.5">
+            <div className="flex gap-1 overflow-x-auto pb-px scrollbar-none w-full md:w-auto">
             <button
               onClick={() => setActiveTab('calculator')}
-              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
+              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 whitespace-nowrap ${
                 activeTab === 'calculator'
                   ? 'border-indigo-500 text-white bg-[#14171F]/50 rounded-t-xl'
                   : 'border-transparent text-slate-455'
@@ -1701,7 +1825,7 @@ export default function App() {
               onClick={() => {
                 setActiveTab('portfolio');
               }}
-              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
+              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 whitespace-nowrap ${
                 activeTab === 'portfolio'
                   ? 'border-emerald-500 text-white bg-[#14171F]/50 rounded-t-xl'
                   : 'border-transparent text-slate-455'
@@ -1717,10 +1841,25 @@ export default function App() {
             </button>
 
             <button
+              id="tab-btn-discipline"
+              onClick={() => {
+                setActiveTab('discipline');
+              }}
+              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 whitespace-nowrap ${
+                activeTab === 'discipline'
+                  ? 'border-violet-500 text-white bg-[#14171F]/50 rounded-t-xl'
+                  : 'border-transparent text-slate-450'
+              }`}
+            >
+              <Scale className="w-4 h-4 text-violet-400" />
+              Phân Tích Kỷ Luật (Pro Trader)
+            </button>
+
+            <button
               onClick={() => {
                 setActiveTab('plans');
               }}
-              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 ${
+              className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 whitespace-nowrap ${
                 activeTab === 'plans'
                   ? 'border-yellow-500 text-white bg-[#14171F]/50 rounded-t-xl'
                   : 'border-transparent text-slate-450'
@@ -1770,6 +1909,7 @@ export default function App() {
           </div>
         </div>
       </div>
+    </div>
 
       {/* Main Workspace Render */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 flex-1 w-full">
@@ -1802,10 +1942,21 @@ export default function App() {
               }>
                 {/* Pre-Trade Checklist (Placed on top for maximum priority) */}
                 <PreTradeChecklist
+                  title={checklistTitle}
+                  onUpdateTitle={setChecklistTitle}
                   items={checklist}
                   onToggleCheck={handleToggleCheck}
                   onAddItem={handleAddChecklistItem}
                   onDeleteItem={handleDeleteChecklistItem}
+                  isPremium={isPremium}
+                  onTriggerPaywall={() => setShowPaywall(true)}
+                  profiles={checklistProfiles}
+                  activeProfileId={activeProfileId}
+                  onSelectProfile={setActiveProfileId}
+                  onCreateProfile={handleCreateProfile}
+                  onDeleteProfile={handleDeleteProfile}
+                  emotion={setup.emotion}
+                  onUpdateEmotion={(emo) => updateSetup({ emotion: emo })}
                 />
 
                 {/* Core Inputs Card */}
@@ -2116,7 +2267,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={handleAttemptLogTrade}
-                        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl select-none cursor-pointer duration-200 transition-all shadow-md hover:shadow-emerald-950/20 flex items-center justify-center gap-2 uppercase tracking-wider"
+                        className="w-full py-3 px-4 text-white font-extrabold text-xs rounded-xl select-none duration-200 transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 cursor-pointer hover:shadow-emerald-950/20"
                       >
                         <Play className="w-4 h-4 fill-current shrink-0" />
                         Lưu lệnh & Kích hoạt theo dõi
@@ -2302,6 +2453,26 @@ export default function App() {
                   onDeletePlan={handleDeletePlan}
                   onUpdatePlanStatus={handleUpdatePlanStatus}
                   onImportPlanToCalc={handleImportPlanToCalc}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'discipline' && (
+            <motion.div
+              key="discipline"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="pb-12 relative min-h-[400px] w-full"
+            >
+              <div>
+                <TabDisciplineHistory
+                  activeTrades={activeTrades}
+                  closedTrades={closedTrades}
+                  dailyDisciplineLogs={dailyDisciplineLogs}
+                  isPremium={isPremium}
+                  onTriggerPaywall={() => setShowPaywall(true)}
                 />
               </div>
             </motion.div>
@@ -2826,6 +2997,48 @@ export default function App() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Dynamic Notification Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 35, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 25, scale: 0.95 }}
+            transition={{ duration: 0.18 }}
+            className={`fixed bottom-6 right-6 z-150 max-w-sm w-96 p-4 rounded-xl border shadow-2xl flex items-start gap-3 backdrop-blur-xs ${
+              toast.type === 'success' 
+                ? 'bg-[#0F1E19]/90 border-emerald-500/40 text-emerald-300' 
+                : toast.type === 'error' 
+                ? 'bg-[#1C1215]/90 border-rose-500/40 text-rose-300' 
+                : 'bg-[#1C1710]/90 border-amber-500/40 text-amber-300'
+            }`}
+          >
+            <div className="shrink-0 mt-0.5">
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 font-sans" />
+              ) : (
+                <ShieldAlert className="w-5 h-5 text-rose-450 font-sans" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0 font-sans">
+              <span className="font-bold text-xs uppercase tracking-wider block font-sans">
+                {toast.type === 'success' ? 'Thành công' : toast.type === 'error' ? 'Lỗi hệ thống' : 'Cảnh báo'}
+              </span>
+              <p className="mt-1 text-xs leading-normal opacity-90 select-text font-sans">
+                {toast.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="text-slate-500 hover:text-slate-300 transition p-0.5 -mr-1 cursor-pointer font-sans"
+            >
+              <X className="w-4 h-4 font-sans" />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 
