@@ -13,7 +13,6 @@ import {
   X, 
   Smile, 
   Frown,
-  Play,
   RotateCcw,
   Sparkles,
   Award,
@@ -83,7 +82,6 @@ export default function PortfolioTracker({
   const [tempPrice, setTempPrice] = useState<string>('');
   const [editingTrailingId, setEditingTrailingId] = useState<string | null>(null);
   const [tempTrailing, setTempTrailing] = useState<string>('');
-  const [isSimulating, setIsSimulating] = useState(false);
   const [showResetLogsModal, setShowResetLogsModal] = useState(false);
   const [resetPhraseInput, setResetPhraseInput] = useState('');
   const [equityRange, setEquityRange] = useState<'30days' | 'all'>('30days');
@@ -223,26 +221,6 @@ export default function PortfolioTracker({
     }
     return null;
   };
-
-  // Auto price simulation effect
-  useEffect(() => {
-    if (!isSimulating || activeTrades.length === 0) return;
-
-    const interval = setInterval(() => {
-      activeTrades.forEach(trade => {
-        // Shift price slightly (between -0.15% to +0.15%)
-        const percentageShift = (Math.random() * 0.3 - 0.15) / 100;
-        const currentPrice = trade.currentPrice;
-        const newPrice = currentPrice * (1 + percentageShift);
-        
-        // Match base decimals to avoid floating point noise
-        const precision = currentPrice > 100 ? 2 : (currentPrice > 1 ? 4 : 6);
-        onUpdateCurrentPrice(trade.id, parseFloat(newPrice.toFixed(precision)));
-      });
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [isSimulating, activeTrades, onUpdateCurrentPrice]);
 
   // Calculate stats
   const totalActivePnl = activeTrades.reduce((sum, t) => sum + t.pnl, 0);
@@ -1215,20 +1193,6 @@ export default function PortfolioTracker({
             Các Vị Thế Giao Dịch Đang Mở ({activeTrades.length})
           </h3>
         </div>
-        
-        {activeTrades.length > 0 && (
-          <button
-            onClick={() => setIsSimulating(!isSimulating)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold font-sans transition flex items-center gap-1.5 cursor-pointer ${
-              isSimulating 
-                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/50 hover:bg-emerald-950/60' 
-                : 'bg-indigo-950/30 text-indigo-400 border border-indigo-900/50 hover:bg-indigo-950/50'
-            }`}
-          >
-            <Play className={`w-3.5 h-3.5 fill-current ${isSimulating ? 'animate-spin' : ''}`} />
-            {isSimulating ? 'Đang mô phỏng giá chạy...' : 'Mô phỏng thị trường thực'}
-          </button>
-        )}
       </div>
 
       {/* Active Trades Table/List */}
