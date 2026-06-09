@@ -177,6 +177,137 @@ html, body, #root {
   color: #be123c !important; /* rose-700 / dark rose */
 }
 
+/* Orange emotion style */
+.theme-light .bg-orange-950\/20 {
+  background-color: #fff7ed !important;
+}
+.theme-light .border-orange-500\/40 {
+  border-color: #f97316 !important;
+}
+.theme-light .text-orange-400 {
+  color: #c2410c !important;
+}
+
+/* Blue emotion style */
+.theme-light .bg-blue-950\/20 {
+  background-color: #eff6ff !important;
+}
+.theme-light .border-blue-500\/40 {
+  border-color: #3b82f6 !important;
+}
+.theme-light .text-blue-400 {
+  color: #1d4ed8 !important;
+}
+
+/* Violet emotion style */
+.theme-light .bg-violet-950\/20 {
+  background-color: #f5f3ff !important;
+}
+.theme-light .border-violet-500\/40 {
+  border-color: #8b5cf6 !important;
+}
+.theme-light .text-violet-400 {
+  color: #6d28d9 !important;
+}
+
+/* Rose emotion style */
+.theme-light .bg-rose-950\/20 {
+  background-color: #fff1f2 !important;
+}
+.theme-light .border-rose-500\/40 {
+  border-color: #f43f5e !important;
+}
+.theme-light .text-rose-450 {
+  color: #be123c !important;
+}
+
+/* Highly polished header and brand overrides for the Ivory (Light) theme */
+.theme-light header {
+  background-color: var(--bg-card) !important; /* Pure white header background */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Target the brand logo ShieldCheck icon container specifically to make its color prominent in light mode */
+.theme-light header .flex.items-center.gap-2\.5 > div:first-child,
+.theme-light header div.bg-gradient-to-tr {
+  background: linear-gradient(135deg, #6366f1, #4338ca) !important; /* Rich premium indigo gradient */
+  box-shadow: 0 4px 10px -1px rgba(99, 102, 241, 0.35) !important;
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+}
+.theme-light header div.bg-gradient-to-tr svg {
+  color: #ffffff !important;
+}
+
+/* Light theme support for transparent indigo containers & borders */
+.theme-light .bg-indigo-950\/20,
+.theme-light .bg-indigo-950\/30,
+.theme-light .bg-indigo-950\/40,
+.theme-light .bg-indigo-950\/50,
+.theme-light .bg-indigo-950\/70,
+.theme-light .bg-indigo-950\/80 {
+  background-color: var(--accent-glow) !important;
+  border-color: var(--border-app) !important;
+}
+
+.theme-light .hover\:bg-indigo-900\/40:hover {
+  background-color: rgba(79, 70, 229, 0.18) !important;
+}
+
+.theme-light .border-indigo-950,
+.theme-light .border-indigo-950\/50,
+.theme-light .border-indigo-950\/70,
+.theme-light .border-\[\#1e1b4b\] {
+  border-color: var(--border-app) !important;
+}
+
+.theme-light .text-indigo-300,
+.theme-light .text-indigo-400 {
+  color: rgb(var(--accent-color)) !important;
+}
+
+.theme-light .text-indigo-200:hover {
+  color: #3730a3 !important; /* Indigo-800 */
+}
+
+/* Pre-Trade Checklist custom transparent boxes and buttons */
+.theme-light .bg-\[\#1C212D\]\/10 {
+  background-color: var(--bg-light) !important;
+}
+.theme-light .bg-\[\#1C212D\]\/15 {
+  background-color: var(--bg-light) !important;
+}
+.theme-light .bg-\[\#1C212D\]\/30,
+.theme-light .bg-\[\#1C212D\]\/40 {
+  background-color: var(--bg-app) !important;
+}
+.theme-light .bg-\[\#1C212D\]\/45 {
+  background-color: var(--bg-light) !important;
+  color: var(--text-muted) !important;
+}
+.theme-light .bg-\[\#1C212D\]\/45:hover {
+  background-color: #cbd5e1 !important;
+  color: var(--text-main) !important;
+}
+.theme-light .bg-\[\#191D28\]\/20,
+.theme-light .bg-\[\#191D28\]\/40 {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-app) !important;
+}
+.theme-light .ring-slate-800 {
+  --tw-ring-color: var(--border-app) !important;
+}
+
+/* High contrast hover tooltips */
+.theme-light .group-hover\:block {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+.theme-light .group-hover\:block span {
+  color: #0d172a !important;
+}
+
 /* Support slash-opacity backgrounds for customized theme */
 .theme-customized .bg-\[\#1C212D\]\/60 {
   background-color: var(--bg-light) !important;

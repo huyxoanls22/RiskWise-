@@ -316,7 +316,7 @@ export default function TradingPlanManager({
                         </span>
                         <span className="text-[10px] font-bold text-indigo-400 font-mono tracking-wide">{p.ticker}</span>
                       </div>
-                      <h4 className="font-bold text-slate-200 text-xs sm:text-sm mt-2 truncate w-[220px]" title={p.title}>
+                      <h4 className="font-bold text-slate-200 text-xs sm:text-sm mt-2 truncate max-w-full" title={p.title}>
                         {p.title}
                       </h4>
                     </div>

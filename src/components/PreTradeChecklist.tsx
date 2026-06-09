@@ -34,6 +34,7 @@ interface PreTradeChecklistProps {
   // New Emotion integration props
   emotion?: 'Bình tĩnh' | 'Hưng phấn' | 'Sợ hãi' | 'FOMO' | 'Cay cú/Trả thù';
   onUpdateEmotion: (emotion: 'Bình tĩnh' | 'Hưng phấn' | 'Sợ hãi' | 'FOMO' | 'Cay cú/Trả thù') => void;
+  style?: React.CSSProperties;
 }
 
 export default function PreTradeChecklist({
@@ -51,7 +52,8 @@ export default function PreTradeChecklist({
   onCreateProfile,
   onDeleteProfile,
   emotion,
-  onUpdateEmotion
+  onUpdateEmotion,
+  style
 }: PreTradeChecklistProps) {
   const [newItemText, setNewItemText] = useState('');
   const [newIsRequired, setNewIsRequired] = useState(true);
@@ -108,7 +110,7 @@ export default function PreTradeChecklist({
   const isSafeToTrade = isChecklistDone && !!emotion;
 
   return (
-    <div id="pre-trade-checklist-card" className="bg-[#14171F] rounded-2xl p-5 border border-slate-800/80 shadow-md">
+    <div id="pre-trade-checklist-card" className="bg-[#14171F] rounded-2xl p-5 border border-slate-800/80 shadow-md" style={style}>
       
       {/* Title block with edit option */}
       <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-850 gap-2">
@@ -267,7 +269,7 @@ export default function PreTradeChecklist({
         </label>
         
         {/* Horizontal scrollable / wrap-around row of beautiful emotion nodes */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 font-sans mt-2">
+        <div className="grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-5 gap-2 font-sans mt-2">
           {emotionsList.map((emo) => {
             const isSelected = emotion === emo.value;
             return (

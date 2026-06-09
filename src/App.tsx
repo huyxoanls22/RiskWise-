@@ -1848,7 +1848,7 @@ export default function App() {
               className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 whitespace-nowrap ${
                 activeTab === 'discipline'
                   ? 'border-violet-500 text-white bg-[#14171F]/50 rounded-t-xl'
-                  : 'border-transparent text-slate-450'
+                  : 'border-transparent text-slate-455'
               }`}
             >
               <Scale className="w-4 h-4 text-violet-400" />
@@ -1862,7 +1862,7 @@ export default function App() {
               className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 whitespace-nowrap ${
                 activeTab === 'plans'
                   ? 'border-yellow-500 text-white bg-[#14171F]/50 rounded-t-xl'
-                  : 'border-transparent text-slate-450'
+                  : 'border-transparent text-slate-455'
               }`}
             >
               <FileText className="w-4 h-4 text-yellow-500" />
@@ -1890,22 +1890,6 @@ export default function App() {
                 <option value="light">☀️ Giao diện Sáng (Ivory)</option>
               </select>
             </div>
-
-            {/* Layout Selector */}
-            <div className="flex items-center gap-2 bg-[#14171F] px-3 py-1.5 rounded-xl border border-slate-800 shadow-xs">
-              <span className="text-slate-450 font-bold hidden xs:inline uppercase text-[9px] tracking-wide">Bố cục:</span>
-              <select
-                id="select-app-layout"
-                value={layout}
-                onChange={(e) => setLayout(e.target.value as any)}
-                className="bg-transparent text-slate-200 font-bold focus:outline-hidden cursor-pointer text-xs pr-1"
-              >
-                <option value="standard">🔲 Lưới chuẩn (Nhập trái, Chart phải)</option>
-                <option value="swapped">🔁 Hoán đổi (Chart trái, Nhập phải)</option>
-                <option value="terminal">🖥️ Terminal Pro (Chart siêu rộng)</option>
-                <option value="compact">🔍 Tối giản (Chỉ tính toán rủi ro)</option>
-              </select>
-            </div>
           </div>
         </div>
       </div>
@@ -1920,267 +1904,250 @@ export default function App() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
-              className={
-                layout === 'compact'
-                  ? "max-w-2xl mx-auto space-y-6 pb-6"
-                  : "grid grid-cols-1 lg:grid-cols-12 gap-6 pb-6"
-              }
+              className="max-w-7xl mx-auto space-y-6 pb-6 w-full animate-fadeIn"
             >
-              {/* Column 1: Core Inputs & Checklist */}
-              <div className={
-                layout === 'compact'
-                  ? "space-y-6"
-                  : `space-y-6 ${
-                      layout === 'terminal' 
-                        ? 'lg:col-span-4' 
-                        : 'lg:col-span-5'
-                    } ${
-                      layout === 'swapped' 
-                        ? 'lg:order-last' 
-                        : ''
-                    }`
-              }>
-                {/* Pre-Trade Checklist (Placed on top for maximum priority) */}
-                <PreTradeChecklist
-                  title={checklistTitle}
-                  onUpdateTitle={setChecklistTitle}
-                  items={checklist}
-                  onToggleCheck={handleToggleCheck}
-                  onAddItem={handleAddChecklistItem}
-                  onDeleteItem={handleDeleteChecklistItem}
-                  isPremium={isPremium}
-                  onTriggerPaywall={() => setShowPaywall(true)}
-                  profiles={checklistProfiles}
-                  activeProfileId={activeProfileId}
-                  onSelectProfile={setActiveProfileId}
-                  onCreateProfile={handleCreateProfile}
-                  onDeleteProfile={handleDeleteProfile}
-                  emotion={setup.emotion}
-                  onUpdateEmotion={(emo) => updateSetup({ emotion: emo })}
-                />
-
-                {/* Core Inputs Card */}
-                <div className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs">
-                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-                    <div className="flex items-center gap-2">
-                       <Layers className="w-4 h-4 text-indigo-400" />
-                      <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Thông số vị thế</h2>
+              {layout === 'compact' ? (
+                /* Compact Layout: simple vertical card stack */
+                <div className="max-w-2xl mx-auto space-y-6">
+                  {/* Thiết lập Rủi ro Card */}
+                  <div id="risk-setup-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs animate-fadeIn" style={{ height: '430px', width: '500px', maxWidth: '100%', margin: '0 auto' }}>
+                    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800">
+                      <Scale className="w-4 h-4 text-violet-400" />
+                      <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Thiết lập rủi ro</h2>
                     </div>
 
-                    {/* Simple Buy/Sell toggle inside setup */}
-                    <div className="flex bg-[#1C212D] p-0.5 rounded-lg border border-slate-800 text-[9px] font-bold select-none">
-                      <button
-                        type="button"
-                        onClick={() => updateSetup({ direction: 'long' })}
-                        className={`px-2 py-1 rounded transition-colors ${
-                          (setup.direction || 'long') === 'long' 
-                            ? 'bg-emerald-600 text-white' 
-                            : 'text-slate-500 hover:text-slate-300'
-                        }`}
-                      >
-                        MUA (Long)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateSetup({ direction: 'short' })}
-                        className={`px-2 py-1 rounded transition-colors ${
-                          (setup.direction || 'long') === 'short' 
-                            ? 'bg-rose-600 text-white' 
-                            : 'text-slate-500 hover:text-slate-300'
-                        }`}
-                      >
-                        BÁN (Short)
-                      </button>
+                    <div className="space-y-4">
+                      {/* Account Balance */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                          <span>Số dư tài khoản (Account Balance)</span>
+                          <span className="text-[10px] text-indigo-455 font-bold flex items-center font-mono">
+                            <Wallet className="w-3 h-3 mr-1" />
+                            USD
+                          </span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-3 text-slate-500 font-semibold text-xs">$</span>
+                          <input
+                            id="input-account-balance-compact"
+                            type="number"
+                            step="any"
+                            min="1"
+                            value={setup.accountBalance}
+                            onChange={(e) => updateSetup({ accountBalance: Math.max(1, parseFloat(e.target.value) || 0) })}
+                            className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-650 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Risk Setup Choice */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                          <span>Mức Rủi Ro Mong Muốn (Risk)</span>
+                          <div className="flex bg-[#1C212D] p-0.5 rounded-md gap-0.5 border border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => updateSetup({ riskType: 'percentage', riskValue: 1 })}
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded-xs uppercase tracking-tight cursor-pointer ${
+                                setup.riskType === 'percentage'
+                                  ? 'bg-[#0B0E14] text-indigo-400 border border-slate-800/60'
+                                  : 'text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              %
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateSetup({ riskType: 'amount', riskValue: 100 })}
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded-xs uppercase tracking-tight cursor-pointer ${
+                                setup.riskType === 'amount'
+                                  ? 'bg-[#0B0E14] text-indigo-400 border border-slate-800/60'
+                                  : 'text-[#7C3AED] hover:text-[#9F7AEA]'
+                              }`}
+                            >
+                              USD ($)
+                            </button>
+                          </div>
+                        </label>
+
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-3 text-slate-550 font-bold text-xs">
+                            {setup.riskType === 'percentage' ? '%' : '$'}
+                          </span>
+                          <input
+                            id="input-risk-value-compact"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={setup.riskValue}
+                            onChange={(e) => updateSetup({ riskValue: Math.max(0.01, parseFloat(e.target.value) || 0) })}
+                            className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-655 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
+                          />
+                        </div>
+
+                        {/* Preset Quick Toggles */}
+                        {setup.riskType === 'percentage' && (
+                          <div className="flex gap-1.5 mt-2 overflow-x-auto py-0.5 select-none scrollbar-none">
+                            {[0.5, 1, 2, 3, 5].map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => updateSetup({ riskValue: preset })}
+                                className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
+                                  setup.riskValue === preset
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                    : 'bg-[#1C212D] hover:bg-[#1E2533] border-slate-750 text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                {preset}%
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {setup.riskType === 'amount' && (
+                          <div className="flex gap-1.5 mt-2 overflow-x-auto py-0.5 select-none scrollbar-none">
+                            {[50, 100, 200, 500, 1000].map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => updateSetup({ riskValue: preset })}
+                                className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
+                                  setup.riskValue === preset
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                    : 'bg-[#1C212D] hover:bg-[#1E2533] border-slate-755 text-slate-400 hover:text-slate-200'
+                                }`}
+                              >
+                                ${preset}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Daily Risk Limit Input */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                          <span>Giới Hạn Rủi Ro Ngày (Daily Risk Limit)</span>
+                          <span className="text-[10px] text-[#A78BFA] font-bold font-mono">
+                            % VỐN / NGÀY
+                          </span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-3.5 text-slate-550 font-bold text-xs">%</span>
+                          <input
+                            id="input-daily-limit-compact"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            placeholder="Ví dụ: 2 hoặc 5"
+                            value={setup.dailyLimitPercent !== undefined ? setup.dailyLimitPercent : ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
+                              updateSetup({ dailyLimitPercent: val });
+                            }}
+                            className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-650 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Asset Class Toggles */}
-                  <div className="grid grid-cols-2 gap-2 bg-[#1C212D] p-1 rounded-xl mb-5 border border-slate-800/50">
-                    <button
-                      id="tab-select-forex"
-                      onClick={() => updateSetup({ assetClass: 'forex' })}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
-                        setup.assetClass === 'forex'
-                          ? 'bg-[#0B0E14] text-indigo-400 shadow-sm border border-slate-800/60'
-                          : 'text-slate-455 hover:text-slate-200'
-                      }`}
-                    >
-                      <span>Forex (Lot/Pips)</span>
-                    </button>
-                    <button
-                      id="tab-select-crypto"
-                      onClick={() => updateSetup({ assetClass: 'crypto_stock' })}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
-                        setup.assetClass === 'crypto_stock'
-                          ? 'bg-[#0B0E14] text-emerald-400 shadow-sm border border-slate-800/60'
-                          : 'text-slate-455 hover:text-slate-200'
-                      }`}
-                    >
-                      <span>Crypto &amp; Stocks</span>
-                    </button>
-                  </div>
+                  {/* Pre-Trade Checklist */}
+                  <PreTradeChecklist
+                    title={checklistTitle}
+                    onUpdateTitle={setChecklistTitle}
+                    items={checklist}
+                    onToggleCheck={handleToggleCheck}
+                    onAddItem={handleAddChecklistItem}
+                    onDeleteItem={handleDeleteChecklistItem}
+                    isPremium={isPremium}
+                    onTriggerPaywall={() => setShowPaywall(true)}
+                    profiles={checklistProfiles}
+                    activeProfileId={activeProfileId}
+                    onSelectProfile={setActiveProfileId}
+                    onCreateProfile={handleCreateProfile}
+                    onDeleteProfile={handleDeleteProfile}
+                    emotion={setup.emotion}
+                    onUpdateEmotion={(emo) => updateSetup({ emotion: emo })}
+                    style={{ width: '100%', maxWidth: '100%' }}
+                  />
 
-                  {/* Input Fields */}
-                  <div className="space-y-4">
-                    
-                    {/* Account Balance */}
+                  {/* Thông số vị thế Card */}
+                  <div id="position-params-card-compact" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between" style={{ width: '100%', maxWidth: '100%' }}>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                        <span>Số dư tài khoản (Account Balance)</span>
-                        <span className="text-[10px] text-indigo-455 font-bold flex items-center font-mono">
-                          <Wallet className="w-3 h-3 mr-1" />
-                          USD
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-3 text-slate-500 font-semibold text-xs">$</span>
-                        <input
-                          id="input-account-balance"
-                          type="number"
-                          step="any"
-                          min="1"
-                          value={setup.accountBalance}
-                          onChange={(e) => updateSetup({ accountBalance: Math.max(1, parseFloat(e.target.value) || 0) })}
-                          className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-650 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
-                        />
-                      </div>
-                    </div>
+                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-indigo-400" />
+                          <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Thông số vị thế</h2>
+                        </div>
 
-                    {/* Daily Risk Limit Input */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                        <span>Giới Hạn Rủi Ro Ngày (Daily Risk Limit)</span>
-                        <span className="text-[10px] text-[#A78BFA] font-bold font-mono">
-                          % VỐN / NGÀY
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-3.5 text-slate-550 font-bold text-xs">%</span>
-                        <input
-                          id="input-daily-limit"
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          placeholder="Ví dụ: 2 hoặc 5 (Để trống = Không giới hạn)"
-                          value={setup.dailyLimitPercent !== undefined ? setup.dailyLimitPercent : ''}
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
-                            updateSetup({ dailyLimitPercent: val });
-                          }}
-                          className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-650 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
-                        />
-                      </div>
-                      <p className="text-[9px] text-slate-550 font-sans mt-1 leading-normal">
-                        Dừng giao dịch khi tổng rủi ro các vị thế vào trong một ngày vượt quá giới hạn.
-                      </p>
-                    </div>
-
-                    {/* Risk Setup Choice */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                        <span>Mức Rủi Ro Mong Muốn (Risk)</span>
-                        <div className="flex bg-[#1C212D] p-0.5 rounded-md gap-0.5 border border-slate-800">
+                        <div className="flex bg-[#1C212D] p-0.5 rounded-lg border border-slate-800 text-[9px] font-bold select-none">
                           <button
                             type="button"
-                            id="toggle-risk-pct"
-                            onClick={() => updateSetup({ riskType: 'percentage', riskValue: 1 })}
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-xs uppercase tracking-tight cursor-pointer ${
-                              setup.riskType === 'percentage'
-                                ? 'bg-[#0B0E14] text-indigo-400 border border-slate-800/60'
+                            onClick={() => updateSetup({ direction: 'long' })}
+                            className={`px-2 py-1 rounded transition-colors ${
+                              (setup.direction || 'long') === 'long' 
+                                ? 'bg-emerald-600 text-white' 
                                 : 'text-slate-500 hover:text-slate-300'
                             }`}
                           >
-                            %
+                            MUA (Long)
                           </button>
                           <button
                             type="button"
-                            id="toggle-risk-amount"
-                            onClick={() => updateSetup({ riskType: 'amount', riskValue: 100 })}
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-xs uppercase tracking-tight cursor-pointer ${
-                              setup.riskType === 'amount'
-                                ? 'bg-[#0B0E14] text-indigo-400 border border-slate-800/60'
-                                : 'text-[#7C3AED] hover:text-[#9F7AEA]'
+                            onClick={() => updateSetup({ direction: 'short' })}
+                            className={`px-2 py-1 rounded transition-colors ${
+                              (setup.direction || 'long') === 'short' 
+                                ? 'bg-rose-600 text-white' 
+                                : 'text-slate-500 hover:text-slate-300'
                             }`}
                           >
-                            USD ($)
+                            BÁN (Short)
                           </button>
                         </div>
-                      </label>
-
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-3 text-slate-500 font-bold text-xs">
-                          {setup.riskType === 'percentage' ? '%' : '$'}
-                        </span>
-                        <input
-                          id="input-risk-value"
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          value={setup.riskValue}
-                          onChange={(e) => updateSetup({ riskValue: Math.max(0.01, parseFloat(e.target.value) || 0) })}
-                          className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-655 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
-                        />
                       </div>
 
-                      {/* Preset Quick Toggles */}
-                      {setup.riskType === 'percentage' && (
-                        <div className="flex gap-1.5 mt-2 overflow-x-auto py-0.5 select-none scrollbar-none">
-                          {[0.5, 1, 2, 3, 5].map((preset) => (
-                            <button
-                              key={preset}
-                              type="button"
-                              id={`preset-risk-${preset}`}
-                              onClick={() => updateSetup({ riskValue: preset })}
-                              className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
-                                setup.riskValue === preset
-                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                                  : 'bg-[#1C212D] hover:bg-[#1E2533] border-slate-750 text-slate-400 hover:text-slate-200'
-                              }`}
-                            >
-                              {preset}%
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {setup.riskType === 'amount' && (
-                        <div className="flex gap-1.5 mt-2 overflow-x-auto py-0.5 select-none scrollbar-none">
-                          {[50, 100, 200, 500, 1000].map((preset) => (
-                            <button
-                              key={preset}
-                              type="button"
-                              id={`preset-risk-usd-${preset}`}
-                              onClick={() => updateSetup({ riskValue: preset })}
-                              className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
-                                setup.riskValue === preset
-                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
-                                  : 'bg-[#1C212D] hover:bg-[#1E2533] border-slate-755 text-slate-400 hover:text-slate-200'
-                              }`}
-                            >
-                              ${preset}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <div className="grid grid-cols-2 gap-2 bg-[#1C212D] p-1 rounded-xl mb-5 border border-slate-800/50">
+                        <button
+                          onClick={() => updateSetup({ assetClass: 'forex' })}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
+                            setup.assetClass === 'forex'
+                              ? 'bg-[#0B0E14] text-indigo-400 shadow-sm border border-slate-800/60'
+                              : 'text-slate-455 hover:text-slate-200'
+                          }`}
+                        >
+                          <span>Forex (Lot/Pips)</span>
+                        </button>
+                        <button
+                          onClick={() => updateSetup({ assetClass: 'crypto_stock' })}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
+                            setup.assetClass === 'crypto_stock'
+                              ? 'bg-[#0B0E14] text-emerald-400 shadow-sm border border-slate-800/60'
+                              : 'text-slate-455 hover:text-slate-200'
+                          }`}
+                        >
+                          <span>Crypto &amp; Stocks</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {setup.assetClass === 'forex' ? (
+                          <ForexCalculator setup={setup} onChangeSetup={updateSetup} />
+                        ) : (
+                          <CryptoStockCalculator setup={setup} onChangeSetup={updateSetup} />
+                        )}
+                      </div>
                     </div>
 
-                    {/* Render Asset Specific Layout block */}
-                    {setup.assetClass === 'forex' ? (
-                      <ForexCalculator setup={setup} onChangeSetup={updateSetup} />
-                    ) : (
-                      <CryptoStockCalculator setup={setup} onChangeSetup={updateSetup} />
-                    )}
-
-                    {/* Advanced Section: Margin & Leverage */}
-                    <div className="pt-4 border-t border-slate-800">
+                    <div className="pt-4 border-t border-slate-800 mt-4">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-slate-455 uppercase tracking-wide flex items-center gap-1">
+                        <span className="text-xs font-semibold text-slate-455 uppercase tracking-wide">
                           Giả lập đòn bẩy ký quỹ
                         </span>
                         <span className="text-[11px] font-mono text-indigo-400 font-bold">1:{leverage}</span>
                       </div>
                       
                       <input
-                        id="slider-leverage"
                         type="range"
                         min="1"
                         max="1000"
@@ -2189,217 +2156,516 @@ export default function App() {
                         onChange={(e) => setLeverage(parseInt(e.target.value))}
                         className="w-full h-1.5 bg-[#1C212D] rounded-full appearance-none cursor-pointer accent-indigo-550"
                       />
-                      <div className="flex justify-between text-[9px] font-mono text-slate-500 mt-1">
-                        <span>1:1</span>
-                        <span>1:100</span>
-                        <span>1:500</span>
-                        <span>1:1000</span>
-                      </div>
                     </div>
-
                   </div>
-                </div>
-              </div>
 
-              {/* Column 2: Chart & Results Dashboard */}
-              <div className={
-                layout === 'compact'
-                  ? "space-y-6"
-                  : `space-y-6 ${
-                      layout === 'terminal' 
-                        ? 'lg:col-span-8' 
-                        : 'lg:col-span-7'
-                    } ${
-                      layout === 'swapped' 
-                        ? 'lg:order-first' 
-                        : ''
-                    }`
-              }>
-                {/* TradingView Live Chart widget */}
-                {layout !== 'compact' && (
-                  <TradingViewWidget
-                    setup={setup}
-                    onApplyLivePrice={(price) => setSetup(prev => ({ ...prev, entryPrice: price }))}
+                  <RiskMeter 
+                    balance={setup.accountBalance} 
+                    riskAmount={result.riskAmount} 
+                    riskPercentage={riskPct} 
+                    style={{ width: '100%', maxWidth: '100%' }}
                   />
-                )}
 
-                {/* Grid container for Results side-by-side with RiskMeter and Affiliate */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 animate-fadeIn">
-                  
-                  {/* Results column */}
-                  <div className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between min-h-[415px]">
+                  {/* Results card */}
+                  <div id="results-card-compact" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between" style={{ width: '100%', maxWidth: '100%' }}>
                     <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800">
                       <Sparkles className="w-4 h-4 text-emerald-400" />
                       <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Kết quả vị thế</h2>
                     </div>
 
-                    {/* Massive Output block */}
                     <div className="bg-[#1C212D] border border-slate-800 rounded-2xl p-6 text-center text-white relative overflow-hidden">
-                      <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none"></div>
-                      <div className="absolute left-0 bottom-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-lg pointer-events-none"></div>
-
-                      <span className="block text-[10px] sm:text-xs font-bold text-indigo-400 font-mono tracking-[0.14em] uppercase mb-1">
+                      <span className="block text-xs font-bold text-indigo-400 font-mono tracking-wider mb-1 uppercase">
                         KHỐI LƯỢNG VÀO LỆNH TỐI ƯU
                       </span>
-
                       <div className="mt-3.5 mb-2.5">
-                        <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white select-all">
+                        <span className="text-4xl font-black font-mono text-white">
                           {setup.assetClass === 'forex' 
                             ? (result.positionSizeLots !== undefined ? result.positionSizeLots.toFixed(2) : '0.00') 
                             : (result.positionSizeUnits !== undefined ? result.positionSizeUnits.toLocaleString('en-US', { maximumFractionDigits: 4 }) : '0')
                           }
                         </span>
-                        <span className="text-xs font-bold text-slate-455 font-mono ml-1.5 uppercase">
+                        <span className="text-xs font-bold text-slate-455 ml-1.5 uppercase font-mono">
                           {setup.assetClass === 'forex' ? 'LOTS' : 'UNITS'}
                         </span>
                       </div>
-
-                      <div className="text-[10px] font-mono text-slate-500 flex items-center justify-center gap-1">
-                        <span>Số lượng thô:</span>
-                        <span className="font-bold text-slate-300">
-                          {result.positionSizeUnits.toLocaleString()} units
-                        </span>
-                      </div>
                     </div>
 
-                    {/* Interactive Execution Trigger */}
-                    <div className="space-y-2 mt-4">
-                      <button
-                        type="button"
-                        onClick={handleAttemptLogTrade}
-                        className="w-full py-3 px-4 text-white font-extrabold text-xs rounded-xl select-none duration-200 transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 cursor-pointer hover:shadow-emerald-950/20"
-                      >
-                        <Play className="w-4 h-4 fill-current shrink-0" />
-                        Lưu lệnh & Kích hoạt theo dõi
-                      </button>
-                      <p className="text-[10px] text-slate-550 text-center leading-normal">
-                        Nạp tham số vào danh mục mở &amp; kiểm tra kỷ luật kỷ cương.
-                      </p>
-                    </div>
-
-                    {/* Financial Metrics Cards */}
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                      <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Tổn thất tối đa (SL)</span>
-                        <span className="text-sm font-bold font-mono mt-1 block text-rose-500">
-                          -${result.riskAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                        </span>
-                        <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-800/40 pt-1">
-                          <span className="text-[9px] text-slate-500">({riskPct.toFixed(1)}% tài khoản)</span>
-                          <span className="text-[9px] text-slate-400 font-bold">
-                            Tỷ lệ R:R dự kiến: {result.riskRewardRatio !== undefined ? `1:${result.riskRewardRatio >= 1 ? Math.round(result.riskRewardRatio * 10) / 10 : result.riskRewardRatio.toFixed(1)}` : 'Chưa cài TP'}
-                          </span>
-                        </div>
+                    <button
+                      type="button"
+                      onClick={handleAttemptLogTrade}
+                      className="w-full py-3 px-4 mt-4 text-white font-extrabold text-xs rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 uppercase tracking-wider"
+                    >
+                      Lưu lệnh & Kích hoạt theo dõi
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Standard, Swapped, Terminal Layout of Rows and Side-By-Side Cards */
+                <div className="space-y-6">
+                  {/* Row 1: "khung biểu đồ đặt cạnh bên phải khung thiết lập rủi ro" */}
+                  <div className="flex flex-col lg:flex-row gap-6 items-start justify-start">
+                    {/* Thiết lập Rủi ro Card */}
+                    <div id="risk-setup-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs animate-fadeIn shrink-0" style={{ height: '430px', width: '500px', maxWidth: '100%' }}>
+                      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800">
+                        <Scale className="w-4 h-4 text-violet-400" />
+                        <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Thiết lập rủi ro</h2>
                       </div>
 
-                      <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        {/* Account Balance */}
                         <div>
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Giá trị Hợp đồng</span>
-                          <span className="text-sm font-bold font-mono mt-1 block text-slate-100">
-                            ${result.notionalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                          </span>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span>Số dư tài khoản (Account Balance)</span>
+                            <span className="text-[10px] text-indigo-455 font-bold flex items-center font-mono">
+                              <Wallet className="w-3 h-3 mr-1" />
+                              USD
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-3 text-slate-550 font-semibold text-xs">$</span>
+                            <input
+                              id="input-account-balance"
+                              type="number"
+                              step="any"
+                              min="1"
+                              value={setup.accountBalance}
+                              onChange={(e) => updateSetup({ accountBalance: Math.max(1, parseFloat(e.target.value) || 0) })}
+                              className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-650 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
+                            />
+                          </div>
                         </div>
-                        <span className="text-[9px] text-slate-500 block mt-0.5">Quy mô vị thế thực</span>
+
+                        {/* Risk Setup Choice */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span>Mức Rủi Ro Mong Muốn (Risk)</span>
+                            <div className="flex bg-[#1C212D] p-0.5 rounded-md gap-0.5 border border-slate-800">
+                              <button
+                                type="button"
+                                id="toggle-risk-pct"
+                                onClick={() => updateSetup({ riskType: 'percentage', riskValue: 1 })}
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-xs uppercase tracking-tight cursor-pointer ${
+                                  setup.riskType === 'percentage'
+                                    ? 'bg-[#0B0E14] text-indigo-400 border border-slate-800/60'
+                                    : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                %
+                              </button>
+                              <button
+                                type="button"
+                                id="toggle-risk-amount"
+                                onClick={() => updateSetup({ riskType: 'amount', riskValue: 100 })}
+                                className={`text-[9px] font-bold px-2 py-0.5 rounded-xs uppercase tracking-tight cursor-pointer ${
+                                  setup.riskType === 'amount'
+                                    ? 'bg-[#0B0E14] text-indigo-400 border border-slate-800/60'
+                                    : 'text-[#7C3AED] hover:text-[#9F7AEA]'
+                                }`}
+                              >
+                                USD ($)
+                              </button>
+                            </div>
+                          </label>
+
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-3 text-slate-550 font-bold text-xs">
+                              {setup.riskType === 'percentage' ? '%' : '$'}
+                            </span>
+                            <input
+                              id="input-risk-value"
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={setup.riskValue}
+                              onChange={(e) => updateSetup({ riskValue: Math.max(0.01, parseFloat(e.target.value) || 0) })}
+                              className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-655 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
+                            />
+                          </div>
+
+                          {/* Preset Quick Toggles */}
+                          {setup.riskType === 'percentage' && (
+                            <div className="flex gap-1.5 mt-2 overflow-x-auto py-0.5 select-none scrollbar-none">
+                              {[0.5, 1, 2, 3, 5].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  id={`preset-risk-${preset}`}
+                                  onClick={() => updateSetup({ riskValue: preset })}
+                                  className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
+                                    setup.riskValue === preset
+                                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                      : 'bg-[#1C212D] hover:bg-[#1E2533] border-slate-750 text-slate-400 hover:text-slate-200'
+                                  }`}
+                                >
+                                  {preset}%
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {setup.riskType === 'amount' && (
+                            <div className="flex gap-1.5 mt-2 overflow-x-auto py-0.5 select-none scrollbar-none">
+                              {[50, 100, 200, 500, 1000].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  id={`preset-risk-usd-${preset}`}
+                                  onClick={() => updateSetup({ riskValue: preset })}
+                                  className={`text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer ${
+                                    setup.riskValue === preset
+                                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                      : 'bg-[#1C212D] hover:bg-[#1E2533] border-slate-755 text-slate-400 hover:text-slate-200'
+                                  }`}
+                                >
+                                  ${preset}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Daily Risk Limit Input */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Giới Hạn Rủi Ro Ngày (Daily Risk Limit)</span>
+                            <span className="text-[10px] text-[#A78BFA] font-bold font-mono">
+                              % VỐN / NGÀY
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3.5 top-3.5 text-slate-550 font-bold text-xs">%</span>
+                            <input
+                              id="input-daily-limit"
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              placeholder="Ví dụ: 2 hoặc 5 (Để trống = Không giới hạn)"
+                              value={setup.dailyLimitPercent !== undefined ? setup.dailyLimitPercent : ''}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
+                                updateSetup({ dailyLimitPercent: val });
+                              }}
+                              className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-650 font-mono text-xs font-bold text-white pl-7 pr-3 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition duration-150"
+                            />
+                          </div>
+                          <p className="text-[9px] text-slate-550 font-sans mt-1 leading-normal">
+                            Dừng giao dịch khi tổng rủi ro các vị thế vào trong một ngày vượt quá giới hạn.
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Required margin display */}
-                    <div className="mt-4 bg-indigo-950/20 border border-indigo-900/40 rounded-xl p-3 flex items-center justify-between text-xs">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-indigo-400 uppercase">Tiền ký quỹ yêu cầu (Margin)</span>
-                        <span className="text-slate-500 text-[9px] mt-0.5">Vốn tối thiểu thực tế cần nạp</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-mono font-extrabold text-white text-sm">
-                          ${requiredMargin > 0 ? requiredMargin.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '0.00'}
-                        </span>
-                      </div>
+                    {/* Chart Card */}
+                    <div id="tradingview-live-widget" className="h-[430px] flex-1 min-w-[320px] max-w-full">
+                      <TradingViewWidget
+                        setup={setup}
+                        onApplyLivePrice={(price) => setSetup(prev => ({ ...prev, entryPrice: price }))}
+                        style={{ height: '430px', width: '100%', maxWidth: '100%' }}
+                      />
                     </div>
-
-                    {/* Forex Lots reference table */}
-                    {setup.assetClass === 'forex' && (
-                      <div className="mt-4 border-t border-slate-800 pt-3">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5 font-mono">Quy đổi đơn vị tương đương</span>
-                        <div className="grid grid-cols-3 gap-2 text-center text-[9px] font-mono text-slate-400">
-                          <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
-                            <div className="text-slate-500 uppercase text-[8px] tracking-wide">Standard Lots</div>
-                            <div className="font-bold text-slate-200 mt-1">{(result.positionSizeLots || 0).toFixed(2)}</div>
-                          </div>
-                          <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
-                            <div className="text-slate-500 uppercase text-[8px] tracking-wide">Mini Lots</div>
-                            <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 10).toFixed(1)}</div>
-                          </div>
-                          <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
-                            <div className="text-slate-500 uppercase text-[8px] tracking-wide">Micro Lots</div>
-                            <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 100).toFixed(0)}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Meter & Affiliate column */}
-                  <div className="space-y-6 flex flex-col justify-between">
-                    {/* Live risk evaluation meter */}
-                    <div className="flex-1">
+                  {/* Row 2: "di chuyển khung THÔNG SỐ VỊ THẾ sang bên phải khung CHECKLIST, khung đánh giá rủi ro ở bên phải khung thông số vị thế" */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Pre-Trade Checklist: Col Span 5 */}
+                    <div className="lg:col-span-5 w-full">
+                      <PreTradeChecklist
+                        title={checklistTitle}
+                        onUpdateTitle={setChecklistTitle}
+                        items={checklist}
+                        onToggleCheck={handleToggleCheck}
+                        onAddItem={handleAddChecklistItem}
+                        onDeleteItem={handleDeleteChecklistItem}
+                        isPremium={isPremium}
+                        onTriggerPaywall={() => setShowPaywall(true)}
+                        profiles={checklistProfiles}
+                        activeProfileId={activeProfileId}
+                        onSelectProfile={setActiveProfileId}
+                        onCreateProfile={handleCreateProfile}
+                        onDeleteProfile={handleDeleteProfile}
+                        emotion={setup.emotion}
+                        onUpdateEmotion={(emo) => updateSetup({ emotion: emo })}
+                        style={{ width: '100%', maxWidth: '100%' }}
+                      />
+                    </div>
+
+                    {/* Thông số vị thế Card: Col Span 4 */}
+                    <div className="lg:col-span-4 w-full flex flex-col gap-6">
+                      <div id="position-params-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between" style={{ width: '100%', maxWidth: '100%' }}>
+                        <div>
+                          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                            <div className="flex items-center gap-2">
+                              <Layers className="w-4 h-4 text-indigo-400" />
+                              <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Thông số vị thế</h2>
+                            </div>
+
+                            {/* Simple Buy/Sell toggle inside setup */}
+                            <div className="flex bg-[#1C212D] p-0.5 rounded-lg border border-slate-800 text-[9px] font-bold select-none">
+                              <button
+                                type="button"
+                                onClick={() => updateSetup({ direction: 'long' })}
+                                className={`px-2 py-1 rounded transition-colors ${
+                                  (setup.direction || 'long') === 'long' 
+                                    ? 'bg-emerald-600 text-white' 
+                                    : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                MUA (Long)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateSetup({ direction: 'short' })}
+                                className={`px-2 py-1 rounded transition-colors ${
+                                  (setup.direction || 'long') === 'short' 
+                                    ? 'bg-rose-600 text-white' 
+                                    : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                BÁN (Short)
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Asset Class Toggles */}
+                          <div className="grid grid-cols-2 gap-2 bg-[#1C212D] p-1 rounded-xl mb-5 border border-slate-800/50">
+                            <button
+                              id="tab-select-forex"
+                              onClick={() => updateSetup({ assetClass: 'forex' })}
+                              className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
+                                setup.assetClass === 'forex'
+                                  ? 'bg-[#0B0E14] text-indigo-400 shadow-sm border border-slate-800/60'
+                                  : 'text-slate-455 hover:text-slate-200'
+                              }`}
+                            >
+                              <span>Forex (Lot/Pips)</span>
+                            </button>
+                            <button
+                              id="tab-select-crypto"
+                              onClick={() => updateSetup({ assetClass: 'crypto_stock' })}
+                              className={`py-2 px-3 rounded-lg text-xs font-bold transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
+                                setup.assetClass === 'crypto_stock'
+                                  ? 'bg-[#0B0E14] text-emerald-400 shadow-sm border border-slate-800/60'
+                                  : 'text-slate-455 hover:text-slate-200'
+                              }`}
+                            >
+                              <span>Crypto &amp; Stocks</span>
+                            </button>
+                          </div>
+
+                          {/* Input Fields */}
+                          <div className="space-y-4">
+                            {/* Render Asset Specific Layout block */}
+                            {setup.assetClass === 'forex' ? (
+                              <ForexCalculator setup={setup} onChangeSetup={updateSetup} />
+                            ) : (
+                              <CryptoStockCalculator setup={setup} onChangeSetup={updateSetup} />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Advanced Section: Margin & Leverage */}
+                        <div className="pt-4 border-t border-slate-800 mt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-slate-455 uppercase tracking-wide flex items-center gap-1">
+                              Giả lập đòn bẩy ký quỹ
+                            </span>
+                            <span className="text-[11px] font-mono text-indigo-400 font-bold">1:{leverage}</span>
+                          </div>
+                          
+                          <input
+                            id="slider-leverage"
+                            type="range"
+                            min="1"
+                            max="1000"
+                            step="5"
+                            value={leverage}
+                            onChange={(e) => setLeverage(parseInt(e.target.value))}
+                            className="w-full h-1.5 bg-[#1C212D] rounded-full appearance-none cursor-pointer accent-indigo-550"
+                          />
+                          <div className="flex justify-between text-[9px] font-mono text-slate-500 mt-1">
+                            <span>1:1</span>
+                            <span>1:100</span>
+                            <span>1:500</span>
+                            <span>1:1000</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Affiliate banner (Mẹo tối ưu chi phí trading) */}
+                      <div id="affiliate-card" className="bg-[#14171F] border border-indigo-950/70 rounded-2xl p-4.5 text-xs text-indigo-300 relative overflow-hidden flex items-start gap-3 shadow-xs animate-fadeIn w-full">
+                        <div className="p-2 rounded-xl bg-indigo-950/50 text-indigo-400 mt-0.5 shrink-0">
+                          <Sparkles className="w-4 h-4 animate-pulse" />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="font-bold text-slate-100 text-xs tracking-wide uppercase">Mẹo Tối Ưu Chi Phí Trading</h4>
+                          <p className="text-[11px] text-slate-401 leading-relaxed font-sans mt-0.5">
+                            Kỷ luật quản lý vốn chặt chẽ giúp bạn sống sót lâu dài trong thị trường. Đăng ký tài khoản giao dịch tại các sàn uy tín đối tác để tối ưu hóa thêm 20% chi phí phí:
+                          </p>
+                          <div className="flex gap-2.5 pt-2 flex-wrap">
+                            <a 
+                              href={AFFILIATE_LINKS.binance} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-yellow-450 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                            >
+                              Binance <ExternalLink className="w-3 h-3" />
+                            </a>
+                            <a 
+                              href={AFFILIATE_LINKS.exness} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-amber-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                            >
+                              Exness <ExternalLink className="w-3 h-3" />
+                            </a>
+                            <a 
+                              href={AFFILIATE_LINKS.the5ers} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-sky-400 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
+                            >
+                              The5ers <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ĐÁnh giá rủi ro & Kết quả: Col Span 3 */}
+                    <div className="lg:col-span-3 flex flex-col gap-6 w-full items-center lg:items-start">
+                    
+                      {/* Live risk evaluation meter */}
                       <RiskMeter 
                         balance={setup.accountBalance} 
                         riskAmount={result.riskAmount} 
                         riskPercentage={riskPct} 
+                        style={{ width: '300px', maxWidth: '100%' }}
                       />
-                    </div>
 
-                    {/* Affiliate banner */}
-                    <div className="bg-[#14171F] border border-indigo-950/70 rounded-2xl p-4.5 text-xs text-indigo-300 relative overflow-hidden flex items-start gap-3 shadow-xs">
-                      <div className="p-2 rounded-xl bg-indigo-950/50 text-indigo-400 mt-0.5 shrink-0">
-                        <Sparkles className="w-4 h-4 animate-pulse" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="font-bold text-slate-100 text-xs tracking-wide uppercase">Mẹo Tối Ưu Chi Phí Trading</h4>
-                        <p className="text-[11px] text-slate-401 leading-relaxed font-sans mt-0.5">
-                          Kỷ luật quản lý vốn chặt chẽ giúp bạn sống sót lâu dài trong thị trường. Đăng ký tài khoản giao dịch tại các sàn uy tín đối tác để tối ưu hóa thêm 20% chi phí phí:
-                        </p>
-                        <div className="flex gap-2.5 pt-2 flex-wrap">
-                          <a 
-                            href={AFFILIATE_LINKS.binance} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-yellow-450 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
-                          >
-                            Binance <ExternalLink className="w-3 h-3" />
-                          </a>
-                          <a 
-                            href={AFFILIATE_LINKS.exness} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-amber-500 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
-                          >
-                            Exness <ExternalLink className="w-3 h-3" />
-                          </a>
-                          <a 
-                            href={AFFILIATE_LINKS.the5ers} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-sky-400 hover:underline inline-flex items-center gap-1 font-bold text-[10.5px]"
-                          >
-                            The5ers <ExternalLink className="w-3 h-3" />
-                          </a>
+                      {/* Results card */}
+                      <div id="results-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between" style={{ width: '300px', maxWidth: '100%' }}>
+                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800">
+                          <Sparkles className="w-4 h-4 text-emerald-400" />
+                          <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Kết quả vị thế</h2>
                         </div>
+
+                        {/* Massive Output block */}
+                        <div className="bg-[#1C212D] border border-slate-800 rounded-2xl p-6 text-center text-white relative overflow-hidden">
+                          <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl pointer-events-none"></div>
+                          <div className="absolute left-0 bottom-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-lg pointer-events-none"></div>
+
+                          <span className="block text-[10px] sm:text-xs font-bold text-indigo-400 font-mono tracking-[0.14em] uppercase mb-1">
+                            KHỐI LƯỢNG VÀO LỆNH TỐI ƯU
+                          </span>
+
+                          <div className="mt-3.5 mb-2.5">
+                            <span className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white select-all">
+                              {setup.assetClass === 'forex' 
+                                ? (result.positionSizeLots !== undefined ? result.positionSizeLots.toFixed(2) : '0.00') 
+                                : (result.positionSizeUnits !== undefined ? result.positionSizeUnits.toLocaleString('en-US', { maximumFractionDigits: 4 }) : '0')
+                              }
+                            </span>
+                            <span className="text-xs font-bold text-slate-455 font-mono ml-1.5 uppercase">
+                              {setup.assetClass === 'forex' ? 'LOTS' : 'UNITS'}
+                            </span>
+                          </div>
+
+                          <div className="text-[10px] font-mono text-slate-500 flex items-center justify-center gap-1">
+                            <span>Số lượng thô:</span>
+                            <span className="font-bold text-slate-300">
+                              {result.positionSizeUnits.toLocaleString()} units
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Interactive Execution Trigger */}
+                        <div className="space-y-2 mt-4">
+                          <button
+                            type="button"
+                            onClick={handleAttemptLogTrade}
+                            className="w-full py-3 px-4 text-white font-extrabold text-xs rounded-xl select-none duration-200 transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 cursor-pointer hover:shadow-emerald-950/20"
+                          >
+                            <Play className="w-4 h-4 fill-current shrink-0" />
+                            Lưu lệnh & Kích hoạt theo dõi
+                          </button>
+                          <p className="text-[10px] text-slate-550 text-center leading-normal">
+                            Nạp tham số vào danh mục mở &amp; kiểm tra kỷ luật kỷ cương.
+                          </p>
+                        </div>
+
+                        {/* Financial Metrics Cards */}
+                        <div className="grid grid-cols-2 gap-3 mt-4">
+                          <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3 font-sans">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Tổn thất tối đa (SL)</span>
+                            <span className="text-xs font-bold font-mono mt-1 block text-rose-500 truncate">
+                              -${result.riskAmount.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                            </span>
+                            <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-800/40 pt-1">
+                              <span className="text-[8.5px] text-slate-500">({riskPct.toFixed(1)}% tài khoản)</span>
+                              <span className="text-[8.5px] text-slate-400 font-bold tracking-tight">
+                                R:R: {result.riskRewardRatio !== undefined ? `1:${result.riskRewardRatio >= 1 ? Math.round(result.riskRewardRatio * 10) / 10 : result.riskRewardRatio.toFixed(1)}` : 'Chưa TP'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="bg-[#1C212D] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between font-sans">
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide block">Giá trị HĐ (Notional)</span>
+                              <span className="text-xs font-bold font-mono mt-1 block text-slate-100 truncate">
+                                ${result.notionalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                            <span className="text-[8.5px] text-slate-500 block mt-0.5 leading-tight">Vị thế thực</span>
+                          </div>
+                        </div>
+
+                        {/* Required margin display */}
+                        <div className="mt-4 bg-indigo-950/20 border border-indigo-900/40 rounded-xl p-3 flex items-center justify-between text-xs">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-indigo-400 uppercase">Tiền ký quỹ (Margin)</span>
+                            <span className="text-slate-500 text-[9px] mt-0.5">Vốn tối thiểu cần nạp</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-mono font-extrabold text-white text-xs sm:text-sm">
+                              ${requiredMargin > 0 ? requiredMargin.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '0.00'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Forex Lots reference table */}
+                        {setup.assetClass === 'forex' && (
+                          <div className="mt-4 border-t border-slate-800 pt-3">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5 font-mono">Quy đổi đơn vị tương đương</span>
+                            <div className="grid grid-cols-3 gap-2 text-center text-[9px] font-mono text-slate-400">
+                              <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
+                                <div className="text-slate-500 uppercase text-[8px] tracking-wide">Standard Lots</div>
+                                <div className="font-bold text-slate-200 mt-1">{(result.positionSizeLots || 0).toFixed(2)}</div>
+                              </div>
+                              <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
+                                <div className="text-slate-500 uppercase text-[8px] tracking-wide">Mini Lots</div>
+                                <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 10).toFixed(1)}</div>
+                              </div>
+                              <div className="bg-[#1C212D] border border-slate-800/40 p-2 rounded">
+                                <div className="text-slate-500 uppercase text-[8px] tracking-wide">Micro Lots</div>
+                                <div className="font-bold text-slate-200 mt-1">{((result.positionSizeLots || 0) * 100).toFixed(0)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
+
+
                   </div>
-
                 </div>
+              )}
 
-                {/* Subtle Watermark Credit in bottom-right corner */}
-                <div className="flex justify-end items-center gap-2 mt-4 select-none pb-2">
-                  <span className="font-mono text-[9px] text-slate-500/45 uppercase tracking-widest leading-none">
-                    {partnerRef 
-                      ? `Được giới thiệu bởi ${partnerRef.toUpperCase()}` 
-                      : "Được quản lý rủi ro bởi RiskWise"}
-                  </span>
-                </div>
-
+              {/* Subdued Watermark Credit */}
+              <div className="flex justify-end items-center gap-2 mt-4 select-none pb-2">
+                <span className="font-mono text-[9px] text-slate-500/45 uppercase tracking-widest leading-none">
+                  {partnerRef 
+                    ? `Được giới thiệu bởi ${partnerRef.toUpperCase()}` 
+                    : "Được quản lý rủi ro bởi RiskWise"}
+                </span>
               </div>
             </motion.div>
           )}

@@ -6,9 +6,10 @@ interface RiskMeterProps {
   balance: number;
   riskAmount: number;
   riskPercentage: number;
+  style?: React.CSSProperties;
 }
 
-export default function RiskMeter({ balance, riskAmount, riskPercentage }: RiskMeterProps) {
+export default function RiskMeter({ balance, riskAmount, riskPercentage, style }: RiskMeterProps) {
   // Clamp percentage between 0 and 100 for visual gauge
   const visualPct = Math.min(Math.max(riskPercentage, 0), 10); // Standard gauge clamps visually up to 10%
 
@@ -56,7 +57,7 @@ export default function RiskMeter({ balance, riskAmount, riskPercentage }: RiskM
   const strokeDashoffset = circumference - (Math.min(visualPct, 10) / 10) * circumference;
 
   return (
-    <div id="risk-meter-container" className="bg-[#14171F] rounded-2xl p-5 border border-slate-800/80 flex flex-col items-center w-full">
+    <div id="risk-meter-container" className="bg-[#14171F] rounded-2xl p-5 border border-slate-800/80 flex flex-col items-center w-full" style={style}>
       <div className="w-full flex items-center justify-between mb-4">
         <span className="text-xs font-semibold uppercase tracking-wider text-slate-450">Đánh giá rủi ro</span>
         <div className={`px-2.5 py-0.5 rounded-full border text-xs font-medium flex items-center gap-1.5 ${statusColor}`}>

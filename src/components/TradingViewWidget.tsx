@@ -5,6 +5,7 @@ import { RefreshCw, Radio, Play, Check, Layers, TrendingUp } from 'lucide-react'
 interface TradingViewWidgetProps {
   setup: TradeSetup;
   onApplyLivePrice: (price: number) => void;
+  style?: React.CSSProperties;
 }
 
 // Synchronous Vietnamese stock check helper based on length, pattern, and negative lists
@@ -198,8 +199,8 @@ export async function prefetchPopularPrices() {
   }
 }
 
-export default function TradingViewWidget({ setup, onApplyLivePrice }: TradingViewWidgetProps) {
-  const [widgetType, setWidgetType] = useState<'mini' | 'advanced'>('advanced');
+export default function TradingViewWidget({ setup, onApplyLivePrice, style }: TradingViewWidgetProps) {
+  const [widgetType, setWidgetType] = useState<'mini' | 'advanced'>('mini');
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [priceChange, setPriceChange] = useState<number | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -559,7 +560,7 @@ export default function TradingViewWidget({ setup, onApplyLivePrice }: TradingVi
   };
 
   return (
-    <div className="bg-[#14171F] border border-slate-800/85 rounded-2xl p-4 flex flex-col gap-4" id="tradingview-live-widget">
+    <div className="bg-[#14171F] border border-slate-800/85 rounded-2xl p-4 flex flex-col gap-4" id="tradingview-live-widget" style={{ height: '395.5px', ...style }}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
@@ -571,32 +572,6 @@ export default function TradingViewWidget({ setup, onApplyLivePrice }: TradingVi
             <Radio className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             Biểu Đồ TradingView ({cleanBase})
           </span>
-        </div>
-
-        {/* Toggle widget view size */}
-        <div className="flex bg-[#1C212D] p-0.5 rounded-lg border border-slate-800 text-[9.5px] font-bold">
-          <button
-            type="button"
-            onClick={() => setWidgetType('mini')}
-            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
-              widgetType === 'mini' 
-                ? 'bg-indigo-600 text-white' 
-                : 'text-slate-455 hover:text-slate-200'
-            }`}
-          >
-            Đơn Giản
-          </button>
-          <button
-            type="button"
-            onClick={() => setWidgetType('advanced')}
-            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
-              widgetType === 'advanced' 
-                ? 'bg-indigo-600 text-white' 
-                : 'text-slate-455 hover:text-slate-200'
-            }`}
-          >
-            Đồ Thị Lớn
-          </button>
         </div>
       </div>
 
@@ -652,7 +627,7 @@ export default function TradingViewWidget({ setup, onApplyLivePrice }: TradingVi
       </div>
 
       {/* Main Chart Rendering Container */}
-      <div className="w-full relative rounded-xl overflow-hidden bg-[#10141D] border border-slate-850" style={{ height: widgetType === 'mini' ? '240px' : '400px' }}>
+      <div className="w-full relative rounded-xl overflow-hidden bg-[#10141D] border border-slate-850 flex-1 min-h-[140px]">
         {widgetType === 'mini' ? (
           <iframe
             key={`tv-mini-${tvSymbol}`}
