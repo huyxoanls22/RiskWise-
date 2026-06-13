@@ -15,17 +15,44 @@ export default function ForexCalculator({ setup, onChangeSetup }: ForexCalculato
   const handlePairChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const symbol = e.target.value;
     const pair = FOREX_PAIRS.find(p => p.symbol === symbol) || FOREX_PAIRS[0];
+    const newEntry = DEFAULT_FOREX_PRICES[symbol] || 1.0852;
+    // Set a reasonable default default stopLossPrice (e.g. 20 pips distance)
+    const defaultSLPips = 20;
+    const isShort = setup.direction === 'short';
+    const defaultSLPrice = isShort 
+      ? newEntry + (defaultSLPips * pair.pipSize)
+      : newEntry - (defaultSLPips * pair.pipSize);
+
     onChangeSetup({
       forexPair: symbol,
       // reset custom pip value to the selected pair's default when pair is updated
       pipValueUSD: pair.defaultPipValueUSD,
-      entryPrice: DEFAULT_FOREX_PRICES[symbol] || 1.0852,
+      entryPrice: newEntry,
+      stopLossPrice: Math.round(defaultSLPrice * 100000) / 100000,
+      stopLossPips: defaultSLPips,
+      takeProfitPrice: undefined,
+      takeProfitPips: undefined,
     });
   };
 
   const handleNumChange = (field: keyof TradeSetup, value: string) => {
     const parsed = value === '' ? undefined : Math.max(0, parseFloat(value) || 0);
-    onChangeSetup({ [field]: parsed });
+    if (field === 'entryPrice') {
+      const entryVal = parsed;
+      const slPips = entryVal && setup.stopLossPrice
+        ? Math.round(Math.abs(entryVal - setup.stopLossPrice) / currentPair.pipSize)
+        : setup.stopLossPips;
+      const tpPips = entryVal && setup.takeProfitPrice
+        ? Math.round(Math.abs(setup.takeProfitPrice - entryVal) / currentPair.pipSize)
+        : setup.takeProfitPips;
+      onChangeSetup({
+        entryPrice: entryVal,
+        stopLossPips: slPips,
+        takeProfitPips: tpPips
+      });
+    } else {
+      onChangeSetup({ [field]: parsed });
+    }
   };
 
   return (
@@ -69,50 +96,78 @@ export default function ForexCalculator({ setup, onChangeSetup }: ForexCalculato
         />
       </div>
 
-      {/* Stop Loss Pips */}
+      {/* Stop Loss Price */}
       <div>
         <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
           <span className="flex items-center gap-1">
-            Mức Stop Loss (Pips)
+            GIÁ DỪNG LỖ (STOP LOSS)
             <span className="group relative cursor-help text-slate-500 hover:text-slate-400">
               <HelpCircle className="w-3.5 h-3.5" />
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2.5 bg-slate-930 text-slate-300 text-[10px] rounded-lg shadow-xl hidden group-hover:block z-50 leading-relaxed border border-slate-800">
-                Chỉ số bước nhảy tối thiểu của cặp tỷ giá (Pip). VD: EURUSD dừng lỗ 50 pips.
+                Nhập mức giá dừng lỗ của bạn. Hệ thống sẽ tự động quy đổi khoảng cách ra số Pips.
               </span>
             </span>
           </span>
+          {setup.stopLossPips !== undefined && setup.stopLossPips > 0 && (
+            <span className="text-[10.5px] text-indigo-400 font-bold font-mono">
+              ~ {setup.stopLossPips} Pips
+            </span>
+          )}
         </label>
         <input
           id="input-sl-pips"
           type="number"
-          min="1"
-          max="5000"
-          value={setup.stopLossPips || 10}
-          onChange={(e) => onChangeSetup({ stopLossPips: Math.max(1, parseInt(e.target.value) || 0) })}
+          step="any"
+          min="0"
+          value={setup.stopLossPrice !== undefined ? setup.stopLossPrice : ''}
+          placeholder="VD: 1.0832"
+          onChange={(e) => {
+            const val = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
+            const entryVal = setup.entryPrice !== undefined ? setup.entryPrice : (DEFAULT_FOREX_PRICES[selectedPairSymbol] || 1.0852);
+            const slPips = val && entryVal
+              ? Math.round(Math.abs(entryVal - val) / currentPair.pipSize)
+              : undefined;
+            onChangeSetup({ 
+              stopLossPrice: val,
+              stopLossPips: slPips
+            });
+          }}
           className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-600 font-mono text-xs font-semibold text-white px-3.5 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition"
         />
       </div>
 
-      {/* Target Take Profit Pips */}
+      {/* Target Take Profit Price */}
       <div>
         <label className="block text-xs font-semibold text-emerald-450 uppercase tracking-wider mb-2 flex items-center justify-between">
           <span className="flex items-center gap-1">
-            Mức Take Profit (Pips)
+            Mức Giá Take Profit (TP Price)
             <span className="text-[10px] text-slate-550 font-sans font-medium lowercase">
               (Tùy chọn)
             </span>
           </span>
+          {setup.takeProfitPips !== undefined && setup.takeProfitPips > 0 && (
+            <span className="text-[10.5px] text-emerald-400 font-bold font-mono">
+              ~ {setup.takeProfitPips} Pips
+            </span>
+          )}
         </label>
         <input
           id="input-tp-pips"
           type="number"
+          step="any"
           min="0"
-          max="10000"
-          placeholder="VD: 150 pips (bỏ trống nếu chưa tính)"
-          value={setup.takeProfitPips !== undefined ? setup.takeProfitPips : ''}
+          placeholder="VD: 1.0912 (bỏ trống nếu chưa tính)"
+          value={setup.takeProfitPrice !== undefined ? setup.takeProfitPrice : ''}
           onChange={(e) => {
-            const val = e.target.value === '' ? undefined : Math.max(0, parseInt(e.target.value) || 0);
-            onChangeSetup({ takeProfitPips: val });
+            const val = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
+            const entryVal = setup.entryPrice !== undefined ? setup.entryPrice : (DEFAULT_FOREX_PRICES[selectedPairSymbol] || 1.0852);
+            const tpPips = val && entryVal
+              ? Math.round(Math.abs(val - entryVal) / currentPair.pipSize)
+              : undefined;
+            onChangeSetup({ 
+              takeProfitPrice: val,
+              takeProfitPips: tpPips
+            });
           }}
           className="w-full bg-[#1C212D] border border-slate-700 hover:border-slate-600 font-mono text-xs font-semibold text-white px-3.5 py-3 rounded-xl focus:outline-hidden focus:border-indigo-500 transition"
         />
@@ -121,14 +176,25 @@ export default function ForexCalculator({ setup, onChangeSetup }: ForexCalculato
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mr-1">Chốt Lời nhanh theo R:R:</span>
           {[2, 3, 5, 10].map((ratio) => {
+            const entryPriceVal = setup.entryPrice !== undefined ? setup.entryPrice : (DEFAULT_FOREX_PRICES[selectedPairSymbol] || 1.0852);
             const slPips = setup.stopLossPips || 10;
             const targetPips = slPips * ratio;
+            
+            const isShort = setup.direction === 'short';
+            const priceChange = targetPips * currentPair.pipSize;
+            const targetPrice = isShort 
+              ? Math.max(0, entryPriceVal - priceChange)
+              : entryPriceVal + priceChange;
+
             const isSelected = setup.takeProfitPips === targetPips;
             return (
               <button
                 key={ratio}
                 type="button"
-                onClick={() => onChangeSetup({ takeProfitPips: targetPips })}
+                onClick={() => onChangeSetup({ 
+                  takeProfitPips: targetPips,
+                  takeProfitPrice: Math.round(targetPrice * 100000) / 100000
+                })}
                 className={`px-2 py-1 text-[10px] font-mono font-bold rounded-lg border transition ${
                   isSelected 
                     ? 'bg-emerald-500/10 border-emerald-500 text-emerald-450' 
@@ -139,10 +205,10 @@ export default function ForexCalculator({ setup, onChangeSetup }: ForexCalculato
               </button>
             );
           })}
-          {setup.takeProfitPips !== undefined && (
+          {(setup.takeProfitPips !== undefined || setup.takeProfitPrice !== undefined) && (
             <button
               type="button"
-              onClick={() => onChangeSetup({ takeProfitPips: undefined })}
+              onClick={() => onChangeSetup({ takeProfitPips: undefined, takeProfitPrice: undefined })}
               className="px-2 py-1 text-[10px] font-mono font-bold rounded-lg border bg-[#1C212D]/60 border-rose-900/30 text-rose-450 hover:bg-rose-500/10 cursor-pointer transition"
             >
               Xóa TP
