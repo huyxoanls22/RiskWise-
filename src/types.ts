@@ -79,6 +79,9 @@ export interface PortfolioTrade {
   sector?: string;
   setup?: string;
   emotion?: 'Bình tĩnh' | 'Hưng phấn' | 'Sợ hãi' | 'FOMO' | 'Cay cú/Trả thù';
+  riskPercent?: number;
+  tpPercent?: number;
+  rrRatio?: number;
 }
 
 export interface TradingPlan {

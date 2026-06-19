@@ -138,11 +138,17 @@ export default function CryptoStockCalculator({ setup, onChangeSetup }: CryptoSt
                 const entry = setup.entryPrice || 0;
                 const sl = setup.stopLossPrice || 0;
                 const diff = Math.abs(entry - sl);
-                const direction = setup.direction || 'long';
                 
-                const calculatedTp = direction === 'long' 
-                  ? entry + (diff * ratio) 
-                  : entry - (diff * ratio);
+                // Smart auto-detection of direction:
+                // Primary is based on layout direction, but if sl & entry exist, use mathematical reality (sl > entry means Short).
+                let isShort = (setup.direction || 'long') === 'short';
+                if (entry > 0 && sl > 0) {
+                  isShort = sl > entry;
+                }
+                
+                const calculatedTp = isShort 
+                  ? entry - (diff * ratio) 
+                  : entry + (diff * ratio);
                   
                 if (calculatedTp <= 0) return null; // Can't have a negative or 0 TP price for long/short assets
                 

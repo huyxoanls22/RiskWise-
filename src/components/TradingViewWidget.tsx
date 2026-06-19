@@ -562,71 +562,20 @@ export default function TradingViewWidget({ setup, onApplyLivePrice, style }: Tr
   return (
     <div className="bg-[#14171F] border border-slate-800/85 rounded-2xl p-4 flex flex-col gap-4" id="tradingview-live-widget" style={{ height: '395.5px', ...style }}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-3 gap-2">
         <div className="flex items-center gap-2">
           <div className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-505"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
           </div>
-          <span className="text-slate-100 font-bold text-xs uppercase tracking-wide flex items-center gap-1.5">
+          <span className="text-slate-100 font-bold text-xs uppercase tracking-wide flex items-center gap-1.5 matches-focus-target">
             <Radio className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             Biểu Đồ TradingView ({cleanBase})
           </span>
         </div>
       </div>
 
-      {/* Live price showcase card */}
-      <div className="bg-[#1C212D] border border-slate-800/80 p-3 rounded-xl flex items-center justify-between gap-4">
-        <div>
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block font-mono">Giá Real-time hiện tại</span>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-base font-black font-mono tracking-tight text-white select-all">
-              {livePrice !== null ? (
-                assetClass === 'forex' 
-                  ? livePrice.toFixed(5)
-                  : livePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
-              ) : (
-                <span className="text-slate-650 text-xs italic">Đang cập nhật...</span>
-              )}
-            </span>
-            {livePrice !== null && priceChange !== null && (
-              <span className={`text-[10px] font-mono font-bold ${priceChange >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
-              </span>
-            )}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          disabled={livePrice === null || fetching}
-          onClick={handleApplyPriceClick}
-          className={`px-3 py-1.5 rounded-lg font-bold text-[10.5px] uppercase transition duration-155 flex items-center gap-1.5 cursor-pointer border ${
-            successApply
-              ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white border-transparent shadow-sm'
-          } disabled:opacity-40 disabled:cursor-not-allowed`}
-        >
-          {successApply ? (
-            <>
-              <Check className="w-3.5 h-3.5" /> Thành Công!
-            </>
-          ) : (
-            <>
-              <Play className="w-3.5 h-3.5 fill-current shrink-0" /> Áp dụng vào Entry
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Real-time price feed note (Twelve Data & OTC warning) */}
-      <div className="bg-slate-900/40 border border-slate-800/50 p-3 rounded-xl">
-        <p className="text-[10px] text-slate-400 leading-relaxed font-sans text-left">
-          <span className="font-bold text-slate-350">Lưu ý:</span> Tỷ giá Forex có thể chênh lệch nhẹ do đặc thù dữ liệu phi tập trung (OTC). Vui lòng kiểm tra hoặc nhập giá thủ công để đảm bảo chính xác
-        </p>
-      </div>
-
-      {/* Main Chart Rendering Container */}
+      {/* Main Chart Rendering Container - Takes up maximum space */}
       <div className="w-full relative rounded-xl overflow-hidden bg-[#10141D] border border-slate-850 flex-1 min-h-[140px]">
         {widgetType === 'mini' ? (
           <iframe
@@ -649,7 +598,7 @@ export default function TradingViewWidget({ setup, onApplyLivePrice, style }: Tr
 
       {/* Manual refresh price */}
       <div className="flex items-center justify-between text-[9px] text-slate-500 font-medium">
-        <span>Cập nhật tự động mỗi 12 giây</span>
+        <span>Cập nhật tự động mỗi 12s • Phí OTC có thể lệch nhẹ</span>
         <button
           type="button"
           onClick={fetchLivePrice}

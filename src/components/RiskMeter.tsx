@@ -58,11 +58,11 @@ export default function RiskMeter({ balance, riskAmount, riskPercentage, style }
 
   return (
     <div id="risk-meter-container" className="bg-[#14171F] rounded-2xl p-5 border border-slate-800/80 flex flex-col items-center w-full" style={style}>
-      <div className="w-full flex items-center justify-between mb-4">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-450">Đánh giá rủi ro</span>
-        <div className={`px-2.5 py-0.5 rounded-full border text-xs font-medium flex items-center gap-1.5 ${statusColor}`}>
-          <Icon className="w-3.5 h-3.5" />
-          <span>{riskLabel}</span>
+      <div className="w-full flex items-center justify-between mb-4 gap-2 flex-nowrap overflow-hidden">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-450 whitespace-nowrap shrink-0">Đánh giá rủi ro</span>
+        <div className={`px-2 py-0.5 rounded-full border text-[10px] sm:text-xs font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap max-w-[60%] overflow-hidden ${statusColor}`}>
+          <Icon className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">{riskLabel}</span>
         </div>
       </div>
 

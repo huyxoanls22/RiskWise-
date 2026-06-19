@@ -110,7 +110,8 @@ export default function PreTradeChecklist({
   const isSafeToTrade = isChecklistDone && !!emotion;
 
   return (
-    <div id="pre-trade-checklist-card" className="bg-[#14171F] rounded-2xl p-5 border border-slate-800/80 shadow-md" style={style}>
+    <div id="pre-trade-checklist-card" className="bg-[#14171F] rounded-2xl p-5 border border-slate-800/80 shadow-md h-full flex flex-col" style={style}>
+      <div className="flex-1 flex flex-col gap-3.5 pb-3">
       
       {/* Title block with edit option */}
       <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-850 gap-2">
@@ -393,6 +394,7 @@ export default function PreTradeChecklist({
             </label>
           </div>
         </form>
+      </div>
       </div>
 
       {/* COMPREHENSIVE ELIGIBILITY SAFETY WARNING CONTAINER */}

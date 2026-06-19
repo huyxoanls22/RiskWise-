@@ -38,7 +38,9 @@ import {
   CreditCard,
   Calendar,
   X,
-  Scale
+  Scale,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -1808,7 +1810,7 @@ export default function App() {
       <div className="sticky top-[64px] z-40 bg-[#0B0E14] border-b border-slate-800 py-3 w-full transition duration-150 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-2.5 md:pb-0 gap-3.5">
-            <div className="flex gap-1 overflow-x-auto pb-px scrollbar-none w-full md:w-auto">
+            <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-none w-full md:w-auto">
             <button
               onClick={() => setActiveTab('calculator')}
               className={`py-2.5 px-4.5 text-xs font-bold transition flex items-center gap-2 border-b-2 hover:text-white cursor-pointer select-none shrink-0 whitespace-nowrap ${
@@ -2365,9 +2367,9 @@ export default function App() {
                   </div>
 
                   {/* Row 2: "di chuyển khung THÔNG SỐ VỊ THẾ sang bên phải khung CHECKLIST, khung đánh giá rủi ro ở bên phải khung thông số vị thế" */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:items-stretch items-start">
                     {/* Pre-Trade Checklist: Col Span 5 */}
-                    <div className="lg:col-span-5 w-full">
+                    <div className="lg:col-span-5 w-full h-full flex flex-col">
                       <PreTradeChecklist
                         title={checklistTitle}
                         onUpdateTitle={setChecklistTitle}
@@ -2384,45 +2386,49 @@ export default function App() {
                         onDeleteProfile={handleDeleteProfile}
                         emotion={setup.emotion}
                         onUpdateEmotion={(emo) => updateSetup({ emotion: emo })}
-                        style={{ width: '100%', maxWidth: '100%' }}
+                        style={{ width: '100%', maxWidth: '100%', height: '100%' }}
                       />
                     </div>
 
                     {/* Thông số vị thế Card: Col Span 4 */}
-                    <div className="lg:col-span-4 w-full flex flex-col gap-6">
-                      <div id="position-params-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between" style={{ width: '100%', maxWidth: '100%' }}>
+                    <div className="lg:col-span-4 w-full flex flex-col gap-6 h-full justify-between">
+                      <div id="position-params-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between flex-1" style={{ width: '100%', maxWidth: '100%' }}>
                         <div>
                           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
                             <div className="flex items-center gap-2">
                               <Layers className="w-4 h-4 text-indigo-400" />
                               <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Thông số vị thế</h2>
                             </div>
+                          </div>
 
-                            {/* Simple Buy/Sell toggle inside setup */}
-                            <div className="flex bg-[#1C212D] p-0.5 rounded-lg border border-slate-800 text-[9px] font-bold select-none">
-                              <button
-                                type="button"
-                                onClick={() => updateSetup({ direction: 'long' })}
-                                className={`px-2 py-1 rounded transition-colors ${
-                                  (setup.direction || 'long') === 'long' 
-                                    ? 'bg-emerald-600 text-white' 
-                                    : 'text-slate-500 hover:text-slate-300'
-                                }`}
-                              >
-                                MUA (Long)
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSetup({ direction: 'short' })}
-                                className={`px-2 py-1 rounded transition-colors ${
-                                  (setup.direction || 'long') === 'short' 
-                                    ? 'bg-rose-600 text-white' 
-                                    : 'text-slate-500 hover:text-slate-300'
-                                }`}
-                              >
-                                BÁN (Short)
-                              </button>
-                            </div>
+                          {/* Large Buy/Sell Toggles below the title */}
+                          <div className="grid grid-cols-2 gap-3 mb-5 font-sans">
+                            <button
+                              id="btn-direction-long"
+                              type="button"
+                              onClick={() => updateSetup({ direction: 'long' })}
+                              className={`py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition duration-150 flex items-center justify-center gap-2 cursor-pointer border select-none ${
+                                (setup.direction || 'long') === 'long'
+                                  ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-950/20'
+                                  : 'bg-[#1C212D]/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                              }`}
+                            >
+                              <TrendingUp className="w-4 h-4 shrink-0 text-emerald-400" />
+                              MUA (Long)
+                            </button>
+                            <button
+                              id="btn-direction-short"
+                              type="button"
+                              onClick={() => updateSetup({ direction: 'short' })}
+                              className={`py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition duration-150 flex items-center justify-center gap-2 cursor-pointer border select-none ${
+                                (setup.direction || 'long') === 'short'
+                                  ? 'bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-950/20'
+                                  : 'bg-[#1C212D]/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                              }`}
+                            >
+                              <TrendingDown className="w-4 h-4 shrink-0 text-rose-400" />
+                              BÁN (Short)
+                            </button>
                           </div>
 
                           {/* Asset Class Toggles */}
@@ -2531,18 +2537,18 @@ export default function App() {
                     </div>
 
                     {/* ĐÁnh giá rủi ro & Kết quả: Col Span 3 */}
-                    <div className="lg:col-span-3 flex flex-col gap-6 w-full items-center lg:items-start">
+                    <div className="lg:col-span-3 flex flex-col gap-6 w-full h-full items-center lg:items-stretch">
                     
                       {/* Live risk evaluation meter */}
                       <RiskMeter 
                         balance={setup.accountBalance} 
                         riskAmount={result.riskAmount} 
                         riskPercentage={riskPct} 
-                        style={{ width: '300px', maxWidth: '100%' }}
+                        style={{ width: '100%', maxWidth: '300px', alignSelf: 'center' }}
                       />
 
                       {/* Results card */}
-                      <div id="results-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between" style={{ width: '300px', maxWidth: '100%' }}>
+                      <div id="results-card" className="bg-[#14171F] rounded-2xl p-5 sm:p-6 border border-slate-800/80 shadow-xs flex flex-col justify-between flex-1" style={{ width: '100%', maxWidth: '300px', alignSelf: 'center' }}>
                         <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-800">
                           <Sparkles className="w-4 h-4 text-emerald-400" />
                           <h2 className="font-bold text-slate-100 text-sm sm:text-base uppercase tracking-wide">Kết quả vị thế</h2>
@@ -2660,13 +2666,13 @@ export default function App() {
               )}
 
               {/* Subdued Watermark Credit */}
-              <div className="flex justify-end items-center gap-2 mt-4 select-none pb-2">
-                <span className="font-mono text-[9px] text-slate-500/45 uppercase tracking-widest leading-none">
-                  {partnerRef 
-                    ? `Được giới thiệu bởi ${partnerRef.toUpperCase()}` 
-                    : "Được quản lý rủi ro bởi RiskWise"}
-                </span>
-              </div>
+              {partnerRef && (
+                <div className="flex justify-end items-center gap-2 mt-4 select-none pb-2">
+                  <span className="font-mono text-[9px] text-slate-500/45 uppercase tracking-widest leading-none">
+                    Được giới thiệu bởi {partnerRef.toUpperCase()}
+                  </span>
+                </div>
+              )}
             </motion.div>
           )}
 
