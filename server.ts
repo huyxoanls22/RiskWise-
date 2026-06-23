@@ -7,6 +7,7 @@ import twelvedataHandler from "./api/twelvedata";
 import adminPinVerifyHandler from "./api/license-verify-admin";
 import licenseGenerateHandler from "./api/license-generate";
 import licenseVerifyHandler from "./api/license-verify";
+import feedbacksHandler from "./api/feedbacks";
 
 dotenv.config();
 
@@ -22,6 +23,11 @@ async function startServer() {
   app.post("/api/license/verify", licenseVerifyHandler);
   app.post("/api/license/verify-admin", adminPinVerifyHandler);
   app.post("/api/license/generate", licenseGenerateHandler);
+  
+  // Feedbacks route supporting saving, retrieving and deleting
+  app.post("/api/feedbacks", feedbacksHandler);
+  app.get("/api/feedbacks", feedbacksHandler);
+  app.delete("/api/feedbacks", feedbacksHandler);
 
   // Development vs Production serving configurations
   if (process.env.NODE_ENV !== "production") {

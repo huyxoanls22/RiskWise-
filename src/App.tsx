@@ -39,8 +39,17 @@ import {
   Calendar,
   X,
   Scale,
+  Mail,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  MessageSquare,
+  Bug,
+  Trash2,
+  Search,
+  Lock,
+  Unlock,
+  ArrowLeft,
+  RefreshCw
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -270,8 +279,11 @@ export default function App() {
   // Offline defaults - Unlimited access
   const isUserAdmin = false;
   
+  // GLOBAL CONFIGURATION FOR PUBLIC BETA (Free premium for public beta testers)
+  const IS_PUBLIC_BETA_MODE = true;
+  
   // Real Local Premium State (Initially false for normal users to trigger Paywall upon 21st order)
-  const [isPremium, setIsPremium] = useState<boolean>(() => {
+  const [realIsPremium, setIsPremium] = useState<boolean>(() => {
     try {
       const persisted = localStorage.getItem('trading_is_premium');
       return persisted === 'true';
@@ -280,10 +292,81 @@ export default function App() {
     }
   });
 
-  // Sync isPremium to localStorage
+  const isPremium = IS_PUBLIC_BETA_MODE ? true : realIsPremium;
+
+  // Feedback states
+  const [showFeedbackModal, setShowFeedbackModal] = useState<boolean>(false);
+  const [feedbackEmail, setFeedbackEmail] = useState<string>('');
+  const [feedbackCategory, setFeedbackCategory] = useState<string>('feature');
+  const [feedbackMsg, setFeedbackMsg] = useState<string>('');
+  const [feedbackSuccess, setFeedbackSuccess] = useState<boolean>(false);
+  const [feedbackSending, setFeedbackSending] = useState<boolean>(false);
+  const [emailCopied, setEmailCopied] = useState<boolean>(false);
+
+  // Feedback Admin parameters
+  const [isAdminView, setIsAdminView] = useState<boolean>(false);
+  const [adminPin, setAdminPin] = useState<string>(() => sessionStorage.getItem('trading_admin_pin') || '');
+  const [isAdminAuth, setIsAdminAuth] = useState<boolean>(() => !!sessionStorage.getItem('trading_admin_pin'));
+  const [pendingPinInput, setPendingPinInput] = useState<string>('');
+  const [adminFeedbacks, setAdminFeedbacks] = useState<any[]>([]);
+  const [adminFeedbacksLoading, setAdminFeedbacksLoading] = useState<boolean>(false);
+  const [adminFeedbacksError, setAdminFeedbacksError] = useState<string>('');
+  const [adminSearch, setAdminSearch] = useState<string>('');
+  const [adminCategoryFilter, setAdminCategoryFilter] = useState<string>('all');
+
+  const fetchAdminFeedbacks = async (pinCode: string) => {
+    setAdminFeedbacksLoading(true);
+    setAdminFeedbacksError('');
+    try {
+      const res = await fetch(`/api/feedbacks?pin=${encodeURIComponent(pinCode)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAdminFeedbacks(data.feedbacks || []);
+        setIsAdminAuth(true);
+        setAdminPin(pinCode);
+        sessionStorage.setItem('trading_admin_pin', pinCode);
+      } else {
+        const err = await res.json();
+        setAdminFeedbacksError(err.error || 'Mã PIN không chính xác.');
+        setIsAdminAuth(false);
+      }
+    } catch (e) {
+      setAdminFeedbacksError('Không thể kết nối đến máy chủ.');
+      setIsAdminAuth(false);
+    } finally {
+      setAdminFeedbacksLoading(false);
+    }
+  };
+
+  const deleteAdminFeedback = async (id?: string) => {
+    if (!window.confirm(id ? 'Bạn có chắc chắn muốn xóa phản hồi này?' : 'Bạn có chắc chắn muốn XÓA TOÀN BỘ danh sách phản hồi?')) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/feedbacks`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: adminPin, id })
+      });
+      if (res.ok) {
+        if (id) {
+          setAdminFeedbacks(prev => prev.filter(fb => fb.id !== id));
+        } else {
+          setAdminFeedbacks([]);
+        }
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Lỗi khi xóa phản hồi.');
+      }
+    } catch (e) {
+      alert('Không thể kết nối máy chủ.');
+    }
+  };
+
+  // Sync realIsPremium to localStorage
   useEffect(() => {
-    localStorage.setItem('trading_is_premium', String(isPremium));
-  }, [isPremium]);
+    localStorage.setItem('trading_is_premium', String(realIsPremium));
+  }, [realIsPremium]);
 
   // User Theme and Layout personalization states
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -1654,6 +1737,19 @@ export default function App() {
 
   return (
     <div className={`min-h-screen bg-[#0B0E14] text-slate-200 font-sans antialiased selection:bg-indigo-950 selection:text-indigo-300 flex flex-col pb-0 theme-customized theme-${theme}`}>
+      {/* Top Announcement Banner for Public Beta */}
+      {IS_PUBLIC_BETA_MODE && (
+        <div className="bg-[#10141E] border-b border-indigo-500/20 py-2 sm:py-2.5 px-4 text-center text-[11px] sm:text-xs text-slate-100 flex items-center justify-center gap-2 font-medium z-100 shadow-lg relative select-none">
+          <span className="flex h-2 w-2 relative shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+          </span>
+          <span className="tracking-wide">
+            RiskWise Public Beta: Toàn bộ tính năng Quản trị rủi ro chuyên sâu đang được mở khóa <strong className="text-yellow-400 underline decoration-yellow-400/30 underline-offset-2">MIỄN PHÍ</strong>. Hãy trải nghiệm và rèn luyện kỷ luật thép!
+          </span>
+        </div>
+      )}
+
       {/* Top clean header */}
       <header className="border-b border-slate-800/80 bg-[#0B0E14] sticky top-0 z-50">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -1662,8 +1758,12 @@ export default function App() {
               <ShieldCheck className="w-5 h-5 text-indigo-100" />
             </div>
             <div>
-              <h1 className="font-sans font-black text-white text-sm tracking-wide sm:text-base leading-none uppercase">
-                RiskWise <span className="text-indigo-400 font-light">Management</span>
+              <h1 className="font-sans font-black text-white text-sm tracking-wide sm:text-base leading-none uppercase flex items-center gap-1.5 select-none">
+                RiskWise
+                {IS_PUBLIC_BETA_MODE && (
+                  <span className="bg-orange-500/15 text-orange-400 border border-orange-500/35 px-1.5 py-0.5 rounded-lg text-[9px] font-black tracking-widest leading-none">BETA</span>
+                )}
+                <span className="text-indigo-400 font-light hidden sm:inline">Management</span>
               </h1>
               <p className="text-[10px] text-slate-450 mt-1 font-semibold">
                 Nền tảng quản lý rủi ro chuyên nghiệp dành cho Trader
@@ -1672,6 +1772,21 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-3">
+
+            {/* Gửi Phản Hồi Button */}
+            <button
+              onClick={() => {
+                setFeedbackSuccess(false);
+                setFeedbackMsg('');
+                setShowFeedbackModal(true);
+              }}
+              className="p-1.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-400 hover:text-rose-300 rounded-xl transition duration-150 flex items-center gap-1.5 text-[11px] font-black cursor-pointer select-none"
+              title="Gửi phản hồi đóng góp ý kiến hoặc báo lỗi cho nhà phát triển"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-rose-400" />
+              <span className="hidden sm:inline">PHẢN HỒI / BÁO LỖI</span>
+              <span className="sm:hidden">PHẢN HỒI</span>
+            </button>
 
             {/* Premium Indicator Badge/Toggle Button */}
             {isPremium ? (
@@ -2905,9 +3020,249 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* FEEDBACK MODAL */}
+      <AnimatePresence>
+        {showFeedbackModal && (
+          <div className="fixed inset-0 bg-[#06080C]/90 backdrop-blur-xs flex items-center justify-center p-3 z-100 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="bg-[#141720] border border-slate-800 rounded-2xl p-5 sm:p-6 max-w-xl w-full my-auto shadow-2xl relative overflow-hidden transition-all duration-300"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setShowFeedbackModal(false);
+                  setFeedbackSuccess(false);
+                  setFeedbackMsg('');
+                  setFeedbackEmail('');
+                  setEmailCopied(false);
+                }}
+                className="absolute right-4 top-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="space-y-4 text-left">
+                {/* Header view */}
+                <div className="flex items-start gap-3 border-b border-slate-800/80 pb-3.5">
+                  <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl mt-1.5 sm:mt-0">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-slate-100 uppercase tracking-wider font-sans">
+                      Ý Kiến Đóng Góp & Báo Lỗi Beta
+                    </h3>
+                    <p className="text-[10px] text-slate-450 font-semibold leading-relaxed mt-1">
+                      Mọi ý kiến của bạn sẽ được chuyển thẳng đến Ban quản trị tại: <span className="text-rose-400 font-bold underline select-all">adminriskwise@gmail.com</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Email Address block copy bar */}
+                <div className="flex items-center justify-between p-2.5 bg-[#0B0E14] border border-slate-850 rounded-xl relative select-none">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-rose-500 rounded-full animate-ping" />
+                    <span className="text-[11px] text-slate-300 font-mono">adminriskwise@gmail.com</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText("adminriskwise@gmail.com");
+                      setEmailCopied(true);
+                      setTimeout(() => setEmailCopied(false), 2000);
+                    }}
+                    className="py-1 px-2.5 bg-[#1C202E] hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 uppercase tracking-wider border border-slate-800"
+                  >
+                    {emailCopied ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-400 text-[9px]">Đã sao chép</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-slate-400" />
+                        <span>Sao chép</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {feedbackSuccess ? (
+                  <div className="py-6 text-center space-y-3 select-none">
+                    <div className="mx-auto w-12 h-12 bg-emerald-500/15 border border-emerald-500/30 rounded-full flex items-center justify-center text-emerald-400">
+                      <Check className="w-6 h-6" />
+                    </div>
+                    <h4 className="text-sm font-bold text-emerald-400">Đã Ghi Nhận Phản Hồi!</h4>
+                    <p className="text-xs text-slate-300 px-4 leading-normal">
+                      Cảm ơn bạn đã đóng góp ý kiến về hệ thống RiskWise Beta. Dữ liệu của bạn đã được ghi nhận trên máy chủ và sẵn sàng hỗ trợ tại email <b>adminriskwise@gmail.com</b>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFeedbackSuccess(false);
+                        setShowFeedbackModal(false);
+                      }}
+                      className="mt-2 py-2 px-6 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer transition uppercase tracking-wider"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!feedbackMsg.trim()) return;
+                      
+                      setFeedbackSending(true);
+                      try {
+                        const res = await fetch("/api/feedbacks", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            email: feedbackEmail,
+                            category: feedbackCategory,
+                            message: feedbackMsg,
+                            userAgent: navigator.userAgent
+                          })
+                        });
+                        
+                        if (res.ok) {
+                          setFeedbackSuccess(true);
+                          setFeedbackMsg('');
+                        } else {
+                          const errData = await res.json();
+                          alert(errData.error || "Gặp lỗi khi gửi phản hồi lên máy chủ!");
+                        }
+                      } catch (err) {
+                        alert("Không thể kết nối đến máy chủ. Vui lòng thử lại sau!");
+                      } finally {
+                        setFeedbackSending(false);
+                      }
+                    }}
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans mb-1.5">Email liên hệ của bạn (Không bắt buộc):</label>
+                      <input
+                        type="email"
+                        value={feedbackEmail}
+                        onChange={(e) => setFeedbackEmail(e.target.value)}
+                        placeholder="email-cua-ban@gmail.com (Để chúng tôi phản hồi lại bạn)"
+                        className="w-full px-3 py-2 bg-[#0B0E14] border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 font-sans"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans mb-1.5">Phân loại đóng góp:</label>
+                      <select
+                        value={feedbackCategory}
+                        onChange={(e) => setFeedbackCategory(e.target.value)}
+                        className="w-full px-3 py-2 bg-[#0B0E14] border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 font-sans cursor-pointer"
+                      >
+                        <option value="feature">💡 Đóng góp tính năng mới</option>
+                        <option value="bug">🐛 Báo cáo lỗi kỹ thuật (Bug report)</option>
+                        <option value="ux">✨ Góp ý cải tiến giao diện / UX</option>
+                        <option value="other">💬 Ý kiến đóng góp khác</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans mb-1.5">Nội dung chi tiết <span className="text-rose-500 font-black animate-pulse">*</span>:</label>
+                      <textarea
+                        required
+                        value={feedbackMsg}
+                        onChange={(e) => setFeedbackMsg(e.target.value)}
+                        placeholder="Mô tả chi tiết những tính năng bạn muốn cải tiến hoặc lỗi kỹ thuật phát sinh giúp ích cải thiện sản phẩm..."
+                        rows={4}
+                        className="w-full px-3 py-2.5 bg-[#0B0E14] border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 font-sans resize-none custom-scrollbar"
+                      />
+                    </div>
+
+                    {/* TWO COMPOSITION ACTIONS (Direct Email Composer & Direct Database Sync) */}
+                    <div className="space-y-2 pt-1 font-sans">
+                      <div className="text-[10px] text-slate-450 font-bold uppercase tracking-wider block mb-2 select-none">Cách thức gửi phản hồi:</div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 select-none">
+                        {/* Primary Client Direct Compose Email Target to dev */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!feedbackMsg.trim()) {
+                              alert("Vui lòng ghi nội dung chi tiết phản hồi trước khi mở ứng dụng Email!");
+                              return;
+                            }
+                            
+                            const catLabels: {[key: string]: string} = {
+                              feature: "ĐÓNG GÓP TÍNH NĂNG",
+                              bug: "BÁO LỖI KỸ THUẬT (BUG)",
+                              ux: "CẢI TIẾN GIAO DIỆN",
+                              other: "Ý KIẾN ĐÓNG GÓP KHÁC"
+                            };
+                            
+                            const categoryLabel = catLabels[feedbackCategory] || "PHẢN HỒI BETA";
+                            const emailSubject = encodeURIComponent(`[RiskWise Public Beta] ${categoryLabel}`);
+                            
+                            const emailBody = encodeURIComponent(
+                              `XIN CHÀO BAN QUẢN TRỊ RISKWISE,\n\n` +
+                              `Dưới đây là ý kiến đóng góp của tôi từ phiên bản Beta:\n` +
+                              `========================================\n` +
+                              `• Phân loại: ${categoryLabel}\n` +
+                              `• Email liên hệ: ${feedbackEmail || "Không cung cấp"}\n` +
+                              `• Nội dung đóng góp:\n${feedbackMsg}\n` +
+                              `========================================\n` +
+                              `• Trình duyệt thiết bị: ${navigator.userAgent}\n` +
+                              `• Thời gian hệ thống: ${new Date().toLocaleString("vi-VN")}\n\n` +
+                              `Rất mong nhận được phản hồi sớm từ đội ngũ phát triển!`
+                            );
+                            
+                            window.open(`mailto:adminriskwise@gmail.com?subject=${emailSubject}&body=${emailBody}`);
+                          }}
+                          className="py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl cursor-pointer transition uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-indigo-950/20 active:scale-98"
+                          title="Tạo bản nháp email pre-filled mở trực tiếp ứng dụng Mail"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Mở app gửi Email 📬</span>
+                        </button>
+
+                        {/* Traditional backup server capture */}
+                        <button
+                          type="submit"
+                          disabled={feedbackSending}
+                          className="py-3 px-4 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-800 text-white text-xs font-black rounded-xl cursor-pointer transition uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 active:scale-98"
+                          title="Gửi dữ liệu ghi lại lên Server nội bộ của hệ thống"
+                        >
+                          {feedbackSending ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>ĐANG GỬI...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Gửi Trực Tuyến ⚡</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex justify-between items-center text-[9px] text-slate-500 pt-1 select-none">
+                        <span>💡 Soạn Email qua app giúp bảo vệ độ tin cậy thư gửi 100%</span>
+                        <span>RiskWise Public Beta v1.0</span>
+                      </div>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* PREMIUM PAYWALL MODAL (Rule 5 & 10) */}
       <AnimatePresence>
-        {showPaywall && (
+        {showPaywall && !IS_PUBLIC_BETA_MODE && (
           <div className="fixed inset-0 bg-[#06080C]/90 backdrop-blur-xs flex items-center justify-center p-3 z-100 overflow-y-auto">
             <motion.div
               initial={{ scale: 0.96, opacity: 0 }}

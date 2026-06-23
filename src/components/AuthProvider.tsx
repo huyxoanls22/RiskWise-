@@ -33,6 +33,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
 
+  const IS_PUBLIC_BETA_MODE = true;
+
   const [isPremium, setIsPremium] = useState<boolean>(() => {
     try {
       const persisted = localStorage.getItem('trading_is_premium');
@@ -42,7 +44,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const effectiveIsPremium = IS_PUBLIC_BETA_MODE || isPremium;
+
   const [premiumExpiry, setPremiumExpiry] = useState<string>(() => {
+    if (IS_PUBLIC_BETA_MODE) {
+      return "Phần thưởng Public Beta: Trọn vẹn tính năng PREMIUM (Miễn phí)";
+    }
     try {
       const cachedExpiry = localStorage.getItem('trading_license_expiry_str');
       if (cachedExpiry) {
@@ -89,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{
       user,
-      isPremium,
+      isPremium: effectiveIsPremium,
       login,
       logout,
       togglePremium,
