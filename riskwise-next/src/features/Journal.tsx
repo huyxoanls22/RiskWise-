@@ -13,13 +13,15 @@ import {
 } from "recharts";
 import { Brain, TrendingUp, Lightbulb, Activity } from "lucide-react";
 import { useSelector } from "../store/store";
-import { computeStats, equityCurve, emotionBreakdown, buildInsights } from "../lib/analytics";
+import { computeStats, equityCurve, emotionBreakdown, buildInsights, computeDisciplineScore } from "../lib/analytics";
 import { Card, StatCard, EmptyState, Badge } from "../components/ui";
 import { fmtMoney, fmtPct, fmtNum } from "../lib/format";
+import { EMOTION_META } from "../lib/types";
+import DisciplineScore from "../components/DisciplineScore";
 
-const POS = "#10b981";
-const NEG = "#f43f5e";
-const BRAND = "#f59e0b";
+const POS = "#3DDC97";
+const NEG = "#FB7185";
+const BRAND = "#3DDC97";
 
 export default function Journal() {
   const trades = useSelector((d) => d.trades);
@@ -27,6 +29,7 @@ export default function Journal() {
   const curve = useMemo(() => equityCurve(trades), [trades]);
   const emotions = useMemo(() => emotionBreakdown(trades), [trades]);
   const insights = useMemo(() => buildInsights(stats, emotions), [stats, emotions]);
+  const discipline = useMemo(() => computeDisciplineScore(trades), [trades]);
 
   if (stats.total === 0) {
     return (
@@ -42,6 +45,8 @@ export default function Journal() {
 
   return (
     <div className="space-y-5">
+      <DisciplineScore data={discipline} />
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Tổng lệnh" value={stats.total} />
         <StatCard label="Win rate" value={fmtPct(stats.winRate, 1)} tone={stats.winRate >= 50 ? "pos" : "neg"} />
@@ -111,7 +116,10 @@ export default function Journal() {
           <div className="mt-3 space-y-1.5">
             {emotions.map((e) => (
               <div key={e.emotion} className="flex items-center justify-between text-xs">
-                <span className="text-muted">{e.label}</span>
+                <span className="flex items-center gap-2 text-muted">
+                  <span className="h-2 w-2 rounded-full" style={{ background: EMOTION_META[e.emotion].color }} />
+                  {e.label}
+                </span>
                 <span className="flex items-center gap-2">
                   <Badge tone={e.winRate >= 50 ? "pos" : "neg"}>{fmtPct(e.winRate, 0)} WR</Badge>
                   <span className={e.netPnl >= 0 ? "text-pos num" : "text-neg num"}>{fmtMoney(e.netPnl)}</span>

@@ -4,7 +4,7 @@ import { clsx } from "../lib/format";
 /* ---------------------------------------------------------------- Card */
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={clsx("card p-5 shadow-sm", className)} {...rest}>
+    <div className={clsx("card p-5", className)} {...rest}>
       {children}
     </div>
   );

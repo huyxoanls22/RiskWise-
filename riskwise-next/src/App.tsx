@@ -15,6 +15,7 @@ import {
 import { useSelector } from "./store/store";
 import { actions } from "./store/actions";
 import { downloadBackup, parseImport } from "./store/io";
+import { computeDisciplineScore } from "./lib/analytics";
 import { Button, Modal, Field, NumberInput } from "./components/ui";
 import { ToastProvider, useToast } from "./components/Toast";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -33,20 +34,46 @@ const TABS: { id: Tab; label: string; icon: typeof CalcIcon }[] = [
   { id: "journal", label: "Phân tích", icon: Brain },
 ];
 
+function DisciplinePill() {
+  const trades = useSelector((d) => d.trades);
+  const score = computeDisciplineScore(trades);
+  if (score.grade === "—") return null;
+  const color = score.tone === "pos" ? "rgb(var(--brand))" : score.tone === "warn" ? "rgb(var(--warn))" : "rgb(var(--neg))";
+  return (
+    <div
+      className="hidden items-center gap-2 rounded-full border px-3 py-1.5 sm:flex"
+      style={{ borderColor: `color-mix(in srgb, ${color} 35%, transparent)`, background: `color-mix(in srgb, ${color} 10%, transparent)` }}
+    >
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full rounded-full" style={{ background: color, animation: "ringPulse 2s ease-in-out infinite" }} />
+        <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: color }} />
+      </span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color }}>
+        Kỷ luật {score.score} · {score.label}
+      </span>
+    </div>
+  );
+}
+
 function Header({ onSettings }: { onSettings: () => void }) {
   const theme = useSelector((d) => d.settings.theme);
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur-lg">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-border bg-bg/70 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-slate-950">
+          <div className="glow-brand flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-emerald-600 text-[#04140d]">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-base font-black leading-none tracking-tight text-text">RiskWise</h1>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-brand">Next</span>
+            <h1 className="font-display text-lg font-bold leading-none tracking-tight text-text">
+              Risk<span className="text-brand">Wise</span>
+            </h1>
+            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-faint">Discipline OS</span>
           </div>
         </div>
+
+        <DisciplinePill />
+
         <div className="flex items-center gap-1">
           <button
             onClick={() => actions.setTheme(theme === "dark" ? "light" : "dark")}
@@ -154,11 +181,13 @@ function Shell() {
                 onClick={() => setTab(t.id)}
                 className={clsx(
                   "flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
-                  tab === t.id ? "bg-brand text-slate-950 shadow-sm" : "text-muted hover:text-text"
+                  tab === t.id
+                    ? "bg-gradient-to-br from-brand to-emerald-600 text-[#04140d] glow-brand"
+                    : "text-muted hover:bg-surface-2 hover:text-text"
                 )}
               >
                 <Icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{t.label}</span>
+                <span className="hidden font-display sm:inline">{t.label}</span>
               </button>
             );
           })}

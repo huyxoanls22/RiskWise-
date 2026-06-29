@@ -112,6 +112,88 @@ export function emotionBreakdown(trades: PortfolioTrade[]): EmotionBreakdown[] {
   }).filter((e) => e.trades > 0);
 }
 
+export interface DisciplineComponent {
+  key: string;
+  label: string;
+  value: number; // 0..100
+}
+export interface DisciplineScore {
+  score: number; // 0..100
+  grade: string; // S / A / B / C / D / —
+  label: string;
+  tone: "pos" | "warn" | "neg" | "neutral";
+  components: DisciplineComponent[];
+}
+
+const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
+
+/**
+ * A 0–100 "discipline score" — a credit-score-like measure of trading behaviour,
+ * blending four heuristics from closed trades:
+ *   - checklist adherence (30%)
+ *   - emotional control / % calm entries (25%)
+ *   - risk-size consistency, via coefficient of variation (20%)
+ *   - loss control, via losing streaks and avg-loss vs avg-win (25%)
+ */
+export function computeDisciplineScore(trades: PortfolioTrade[]): DisciplineScore {
+  const c = closed(trades);
+  const zero: DisciplineComponent[] = [
+    { key: "checklist", label: "Tuân thủ checklist", value: 0 },
+    { key: "emotion", label: "Kiểm soát cảm xúc", value: 0 },
+    { key: "consistency", label: "Nhất quán rủi ro", value: 0 },
+    { key: "lossControl", label: "Kiểm soát thua lỗ", value: 0 },
+  ];
+  if (c.length === 0) {
+    return { score: 0, grade: "—", label: "Chưa có dữ liệu", tone: "neutral", components: zero };
+  }
+
+  const stats = computeStats(trades);
+
+  const checklist = clamp(stats.disciplineRate);
+  const calm = c.filter((t) => t.emotion === "calm").length;
+  const emotion = clamp((calm / c.length) * 100);
+
+  const risks = c.map((t) => t.riskAmount).filter((r) => r > 0);
+  let consistency = 100;
+  if (risks.length >= 2) {
+    const mean = risks.reduce((a, b) => a + b, 0) / risks.length;
+    const variance = risks.reduce((a, b) => a + (b - mean) ** 2, 0) / risks.length;
+    const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;
+    consistency = clamp(100 - cv * 100);
+  }
+
+  let lossControl = 100 - clamp(Math.max(0, stats.maxLossStreak - 2) * 18);
+  if (stats.avgWin > 0 && stats.avgLoss > stats.avgWin) {
+    lossControl -= clamp((stats.avgLoss / stats.avgWin - 1) * 30, 0, 30);
+  }
+  lossControl = clamp(lossControl);
+
+  const score = Math.round(
+    checklist * 0.3 + emotion * 0.25 + consistency * 0.2 + lossControl * 0.25
+  );
+
+  let grade = "D";
+  let label = "Mất kiểm soát";
+  let tone: DisciplineScore["tone"] = "neg";
+  if (score >= 85) { grade = "S"; label = "Kỷ luật thép"; tone = "pos"; }
+  else if (score >= 70) { grade = "A"; label = "Vững vàng"; tone = "pos"; }
+  else if (score >= 55) { grade = "B"; label = "Ổn định"; tone = "warn"; }
+  else if (score >= 40) { grade = "C"; label = "Đang dao động"; tone = "warn"; }
+
+  return {
+    score,
+    grade,
+    label,
+    tone,
+    components: [
+      { key: "checklist", label: "Tuân thủ checklist", value: Math.round(checklist) },
+      { key: "emotion", label: "Kiểm soát cảm xúc", value: Math.round(emotion) },
+      { key: "consistency", label: "Nhất quán rủi ro", value: Math.round(consistency) },
+      { key: "lossControl", label: "Kiểm soát thua lỗ", value: Math.round(lossControl) },
+    ],
+  };
+}
+
 /** Human-readable behavioural insights derived from the stats. */
 export function buildInsights(stats: JournalStats, emo: EmotionBreakdown[]): string[] {
   const out: string[] = [];
