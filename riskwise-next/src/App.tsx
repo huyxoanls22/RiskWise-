@@ -17,6 +17,7 @@ import { actions } from "./store/actions";
 import { downloadBackup, parseImport } from "./store/io";
 import { Button, Modal, Field, NumberInput } from "./components/ui";
 import { ToastProvider, useToast } from "./components/Toast";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { clsx } from "./lib/format";
 import Calculator from "./features/Calculator";
 import Portfolio from "./features/Portfolio";
@@ -184,8 +185,10 @@ function Shell() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <Shell />
-    </ToastProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }

@@ -2,11 +2,18 @@
 
 export const fmtMoney = (n: number, currency = "USD"): string => {
   if (!isFinite(n)) return "—";
-  return n.toLocaleString("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  });
+  try {
+    return n.toLocaleString("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    // currency may be an incomplete/invalid ISO code while the user is typing
+    // (e.g. "US" or ""). Intl throws on those — fall back to a plain number.
+    const amount = n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    return currency ? `${amount} ${currency}` : amount;
+  }
 };
 
 export const fmtNum = (n: number, dp = 2): string => {
