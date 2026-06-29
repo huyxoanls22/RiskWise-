@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RiskWise Next — Quản trị rủi ro giao dịch</title>
+    <meta
+      name="description"
+      content="Công cụ tính position size, quản trị rủi ro, theo dõi danh mục và phân tích kỷ luật giao dịch."
+    />
+    <script>
+      // Apply persisted theme before paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var t = localStorage.getItem("rw_theme");
+          var dark = t ? t === "dark" : true;
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
