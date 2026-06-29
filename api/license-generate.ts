@@ -1,23 +1,5 @@
 import type { Request, Response } from "express";
-
-const normalizePin = (str: string): string => {
-  if (!str) return "";
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[đĐ]/g, "d")
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .trim();
-};
-
-const simpleHash = (str: string): string => {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i);
-  }
-  return (hash >>> 0).toString(16).toUpperCase();
-};
+import { verifyAdminPin, signLicensePayload, rateLimit } from "./_security";
 
 const base64Encode = (str: string): string => {
   return Buffer.from(str, "utf-8").toString("base64");
@@ -25,19 +7,19 @@ const base64Encode = (str: string): string => {
 
 export default async function handler(req: Request, res: Response) {
   try {
+    // Throttle to slow down PIN brute-force / mass key minting.
+    if (!rateLimit(req, res, "license-generate", 10, 60 * 1000)) {
+      return res.status(429).json({ success: false, error: "Quá nhiều yêu cầu, vui lòng thử lại sau." });
+    }
+
     const { pin, email, prefix } = req.body || {};
-    
+
     // 1. Authenticate with PIN
     if (!pin) {
       return res.status(400).json({ success: false, error: "Thiếu mã PIN quản trị viên" });
     }
 
-    const correctPin = process.env.ADMIN_PIN || "Emyeubachochiminh@2026";
-    const normalizedEntered = normalizePin(pin);
-    const normalizedCorrect = normalizePin(correctPin);
-    const isPinMatch = (pin === correctPin) || (normalizedEntered === normalizedCorrect);
-
-    if (!isPinMatch) {
+    if (!verifyAdminPin(pin)) {
       return res.status(401).json({ success: false, error: "Mã PIN xác thực sai, từ chối tạo mã!" });
     }
 
@@ -64,12 +46,10 @@ export default async function handler(req: Request, res: Response) {
     const dd = String(expiryDate.getDate()).padStart(2, '0');
     const targetExpiryStr = `${yyyy}-${mm}-${dd}`;
 
-    // 4. Generate License Key Structure
-    const signingKey = process.env.LICENSE_SECRET_KEY || "RISKWISE_SECURE_KEY_2026";
+    // 4. Generate License Key Structure (HMAC-SHA256 signed, server-only secret)
     const payloadStr = `${cleanEmail}:${targetExpiryStr}`;
     const encodedPayload = base64Encode(payloadStr);
-
-    const signature = simpleHash(`${payloadStr}:${signingKey}`);
+    const signature = signLicensePayload(payloadStr);
     const finalLicenseKey = `${safePrefix}${encodedPayload}-${signature}`;
 
     return res.json({
@@ -82,6 +62,6 @@ export default async function handler(req: Request, res: Response) {
 
   } catch (err: any) {
     console.error("Lỗi tạo License key trên server:", err);
-    return res.status(500).json({ success: false, error: err.message || "Lỗi máy chủ nội bộ" });
+    return res.status(500).json({ success: false, error: "Lỗi máy chủ nội bộ" });
   }
 }

@@ -318,7 +318,9 @@ export default function App() {
     setAdminFeedbacksLoading(true);
     setAdminFeedbacksError('');
     try {
-      const res = await fetch(`/api/feedbacks?pin=${encodeURIComponent(pinCode)}`);
+      const res = await fetch(`/api/feedbacks`, {
+        headers: { 'x-admin-pin': pinCode }
+      });
       if (res.ok) {
         const data = await res.json();
         setAdminFeedbacks(data.feedbacks || []);

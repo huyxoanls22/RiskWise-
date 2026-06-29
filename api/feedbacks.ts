@@ -1,13 +1,14 @@
 import type { Request, Response } from "express";
 import fs from "fs";
 import path from "path";
+import { verifyAdminPin, rateLimit } from "./_security";
 
 const FEEDBACK_FILE_PATH = path.join(process.cwd(), "beta_feedbacks.json");
 
 // In-Memory cache fallback in case of strict read-only environments
 let inMemoryFeedbacks: any[] = [];
 
-// Load initial feedbaks
+// Load initial feedbacks
 try {
   if (fs.existsSync(FEEDBACK_FILE_PATH)) {
     const raw = fs.readFileSync(FEEDBACK_FILE_PATH, "utf-8");
@@ -17,47 +18,57 @@ try {
   console.error("Warning: Could not read beta_feedbacks.json from disk, using safe memory cache:", err);
 }
 
-const normalizePin = (str: string): string => {
-  if (!str) return "";
-  return str
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[đĐ]/g, "d")
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .trim();
+/** Strip HTML/angle-bracket content and cap length to neutralize stored XSS. */
+const sanitizeText = (value: unknown, maxLen: number): string => {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/<[^>]*>/g, "") // remove any HTML tags
+    .replace(/[<>]/g, "")    // remove stray angle brackets
+    .trim()
+    .slice(0, maxLen);
 };
 
-const verifyAdminPin = (enteredPin: string): boolean => {
-  const correctPin = process.env.ADMIN_PIN || "Emyeubachochiminh@2026";
-  const normalizedEntered = normalizePin(enteredPin);
-  const normalizedCorrect = normalizePin(correctPin);
-  return (enteredPin === correctPin) || (normalizedEntered === normalizedCorrect);
+/** Extracts the admin PIN from a header (preferred) or request body/query. */
+const extractPin = (req: Request): string => {
+  const headerPin = req.headers["x-admin-pin"];
+  if (typeof headerPin === "string" && headerPin) return headerPin;
+  return (req.body?.pin || req.query?.pin || "") as string;
 };
+
+const ALLOWED_CATEGORIES = ["feature", "bug", "ux", "other"];
 
 export default async function handler(req: Request, res: Response) {
   const method = req.method;
 
   if (method === "POST") {
     try {
+      // Rate-limit anonymous submissions to prevent spam/flooding.
+      if (!rateLimit(req, res, "feedback-post", 5, 60 * 1000)) {
+        return res.status(429).json({ success: false, error: "Bạn gửi phản hồi quá nhanh, vui lòng thử lại sau." });
+      }
+
       const { email, category, message, userAgent } = req.body || {};
-      
-      if (!message || !message.trim()) {
+
+      const cleanMessage = sanitizeText(message, 5000);
+      if (!cleanMessage) {
         return res.status(400).json({ success: false, error: "Nội dung phản hồi không được để trống!" });
       }
 
+      const cleanEmail = sanitizeText(email, 254);
+      const cleanCategory = ALLOWED_CATEGORIES.includes(category) ? category : "feature";
+
       const newFeedback = {
         id: "fb-" + Math.random().toString(36).substring(2, 11),
-        email: (email || "").trim(),
-        category: category || "feature",
-        message: message.trim(),
+        email: cleanEmail,
+        category: cleanCategory,
+        message: cleanMessage,
         submittedAt: new Date().toISOString(),
-        userAgent: userAgent || req.headers["user-agent"] || "unknown"
+        userAgent: sanitizeText(userAgent || req.headers["user-agent"] || "unknown", 512)
       };
 
       inMemoryFeedbacks.unshift(newFeedback);
 
-      // Persist to disk
+      // Persist to disk (best-effort; environment may be read-only)
       try {
         fs.writeFileSync(FEEDBACK_FILE_PATH, JSON.stringify(inMemoryFeedbacks, null, 2), "utf-8");
       } catch (writeErr) {
@@ -69,11 +80,15 @@ export default async function handler(req: Request, res: Response) {
       console.error("Lỗi khi gửi phản hồi:", err);
       return res.status(500).json({ success: false, error: "Lỗi máy chủ khi lưu phản hồi" });
     }
-  } 
-  
+  }
+
   if (method === "GET") {
     try {
-      const pin = req.query.pin as string;
+      if (!rateLimit(req, res, "feedback-admin", 20, 60 * 1000)) {
+        return res.status(429).json({ success: false, error: "Quá nhiều yêu cầu, vui lòng thử lại sau." });
+      }
+
+      const pin = extractPin(req);
       if (!pin) {
         return res.status(400).json({ success: false, error: "Yêu cầu mã PIN quản trị viên để xem!" });
       }
@@ -91,7 +106,11 @@ export default async function handler(req: Request, res: Response) {
 
   if (method === "DELETE") {
     try {
-      const pin = req.body?.pin || req.query?.pin;
+      if (!rateLimit(req, res, "feedback-admin", 20, 60 * 1000)) {
+        return res.status(429).json({ success: false, error: "Quá nhiều yêu cầu, vui lòng thử lại sau." });
+      }
+
+      const pin = extractPin(req);
       const feedbackId = req.body?.id;
 
       if (!pin) {
@@ -103,14 +122,11 @@ export default async function handler(req: Request, res: Response) {
       }
 
       if (feedbackId) {
-        // Delete exact feedback item
         inMemoryFeedbacks = inMemoryFeedbacks.filter(fb => fb.id !== feedbackId);
       } else {
-        // Clear all
         inMemoryFeedbacks = [];
       }
 
-      // Persist to disk
       try {
         fs.writeFileSync(FEEDBACK_FILE_PATH, JSON.stringify(inMemoryFeedbacks, null, 2), "utf-8");
       } catch (writeErr) {

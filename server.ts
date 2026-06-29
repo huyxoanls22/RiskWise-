@@ -15,6 +15,44 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // Security headers applied to every response.
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader(
+      "Permissions-Policy",
+      "camera=(), microphone=(), geolocation=(), payment=()"
+    );
+
+    if (isProduction) {
+      res.setHeader(
+        "Strict-Transport-Security",
+        "max-age=31536000; includeSubDomains"
+      );
+
+      // CSP is only enforced in production: the Vite dev server relies on
+      // inline scripts, eval and websockets that a strict policy would break.
+      const csp = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://s.tradingview.com https://www.googletagmanager.com https://*.google-analytics.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com data:",
+        "img-src 'self' data: https:",
+        "connect-src 'self' https://api.twelvedata.com https://api.binance.com https://www.binance.com https://query1.finance.yahoo.com https://open.er-api.com https://worldtimeapi.org https://services.entrade.com.vn https://api.allorigins.win https://corsproxy.io https://www.googletagmanager.com https://*.google-analytics.com https://*.supabase.co",
+        "frame-src 'self' https://s.tradingview.com https://www.tradingview.com",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "frame-ancestors 'self'",
+      ].join("; ");
+      res.setHeader("Content-Security-Policy", csp);
+    }
+
+    next();
+  });
+
   // Body parsing middleware
   app.use(express.json());
 
