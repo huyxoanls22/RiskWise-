@@ -21,11 +21,11 @@ export const EMOTIONS: { value: Emotion; label: string }[] = [
 
 /** Per-emotion display metadata. `disciplined` flags emotionally-controlled states. */
 export const EMOTION_META: Record<Emotion, { label: string; color: string; disciplined: boolean }> = {
-  calm: { label: "Bình tĩnh", color: "#3DDC97", disciplined: true },
-  excited: { label: "Hưng phấn", color: "#FBBF24", disciplined: false },
-  fearful: { label: "Sợ hãi", color: "#A78BFA", disciplined: false },
-  fomo: { label: "FOMO", color: "#FB923C", disciplined: false },
-  revenge: { label: "Cay cú / Trả thù", color: "#FB7185", disciplined: false },
+  calm: { label: "Bình tĩnh", color: "#5C7A54", disciplined: true },
+  excited: { label: "Hưng phấn", color: "#B08A30", disciplined: false },
+  fearful: { label: "Sợ hãi", color: "#6B6E9E", disciplined: false },
+  fomo: { label: "FOMO", color: "#C2783D", disciplined: false },
+  revenge: { label: "Cay cú / Trả thù", color: "#B24A3A", disciplined: false },
 };
 
 export interface ForexPairConfig {

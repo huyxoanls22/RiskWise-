@@ -43,7 +43,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           </pre>
           <button
             onClick={() => this.setState({ error: null })}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:brightness-110"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-medium text-[rgb(var(--brand-ink))] transition hover:brightness-110"
           >
             <RotateCcw className="h-4 w-4" /> Thử lại
           </button>

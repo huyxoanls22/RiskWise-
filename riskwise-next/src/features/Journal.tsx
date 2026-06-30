@@ -19,9 +19,9 @@ import { fmtMoney, fmtPct, fmtNum } from "../lib/format";
 import { EMOTION_META } from "../lib/types";
 import DisciplineScore from "../components/DisciplineScore";
 
-const POS = "#3DDC97";
-const NEG = "#FB7185";
-const BRAND = "#3DDC97";
+const POS = "#5C7A54";
+const NEG = "#B24A3A";
+const BRAND = "#BF663D";
 
 export default function Journal() {
   const trades = useSelector((d) => d.trades);

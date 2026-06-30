@@ -42,8 +42,8 @@ function bandFor(pct: number): Band {
     };
   if (pct <= 7)
     return {
-      color: "text-orange-400",
-      stroke: "#fb923c",
+      color: "text-neg",
+      stroke: "rgb(var(--neg))",
       label: "Rủi ro cao",
       advice: "Chuỗi 10 lệnh thua liên tiếp có thể bốc hơi 40–50% tài khoản.",
       Icon: ShieldAlert,
@@ -92,7 +92,7 @@ export default function RiskMeter({ riskAmount, riskPercentage, currency = "USD"
           )}
         </svg>
         <div className="absolute top-9 flex flex-col items-center">
-          <span className="num text-3xl font-black text-text">{riskPercentage.toFixed(2)}%</span>
+          <span className="figure text-3xl text-text">{riskPercentage.toFixed(2)}%</span>
           <span className="num mt-0.5 text-[11px] text-muted">-{fmtMoney(riskAmount, currency)}</span>
         </div>
       </div>

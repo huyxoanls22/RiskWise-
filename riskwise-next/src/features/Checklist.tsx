@@ -45,7 +45,7 @@ export default function Checklist() {
               onClick={() => actions.toggleChecklist(item.id)}
               className={clsx(
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition",
-                item.isChecked ? "border-pos bg-pos text-slate-950" : "border-border"
+                item.isChecked ? "border-pos bg-pos text-[rgb(var(--brand-ink))]" : "border-border"
               )}
               aria-label="toggle"
             >

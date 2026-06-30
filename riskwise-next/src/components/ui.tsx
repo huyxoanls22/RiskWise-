@@ -4,7 +4,7 @@ import { clsx } from "../lib/format";
 /* ---------------------------------------------------------------- Card */
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={clsx("card p-5", className)} {...rest}>
+    <div className={clsx("card p-6", className)} {...rest}>
       {children}
     </div>
   );
@@ -12,21 +12,25 @@ export function Card({ className, children, ...rest }: React.HTMLAttributes<HTML
 
 export function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
-    <div className="mb-4">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-muted">{children}</h3>
-      {hint && <p className="mt-1 text-xs text-faint">{hint}</p>}
+    <div className="mb-5">
+      <h3 className="font-serif text-lg text-text">{children}</h3>
+      {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
     </div>
   );
+}
+
+/** Small all-caps overline label used throughout for a calm, editorial rhythm. */
+export function Overline({ children }: { children: React.ReactNode }) {
+  return <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-faint">{children}</span>;
 }
 
 /* -------------------------------------------------------------- Button */
 type BtnVariant = "primary" | "ghost" | "outline" | "danger" | "pos";
 const btnStyles: Record<BtnVariant, string> = {
-  primary:
-    "bg-brand text-slate-950 hover:brightness-110 font-bold shadow-sm shadow-brand/20",
-  pos: "bg-pos text-slate-950 hover:brightness-110 font-bold",
-  danger: "bg-neg/15 text-neg hover:bg-neg/25 border border-neg/30",
-  outline: "border border-border text-text hover:bg-surface-2",
+  primary: "bg-brand text-[rgb(var(--brand-ink))] hover:brightness-[1.06]",
+  pos: "bg-pos text-[rgb(var(--brand-ink))] hover:brightness-[1.06]",
+  danger: "text-neg border border-neg/30 hover:bg-neg/8",
+  outline: "border border-border-strong text-text hover:bg-surface-2",
   ghost: "text-muted hover:bg-surface-2 hover:text-text",
 };
 
@@ -39,7 +43,7 @@ export function Button({
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
         btnStyles[variant],
         className
       )}
@@ -60,15 +64,15 @@ export function Badge({
 }) {
   const tones = {
     neutral: "bg-surface-2 text-muted border-border",
-    pos: "bg-pos/10 text-pos border-pos/30",
-    neg: "bg-neg/10 text-neg border-neg/30",
-    warn: "bg-warn/10 text-warn border-warn/30",
-    brand: "bg-brand/10 text-brand border-brand/30",
+    pos: "bg-pos/10 text-pos border-pos/25",
+    neg: "bg-neg/10 text-neg border-neg/25",
+    warn: "bg-warn/10 text-warn border-warn/25",
+    brand: "bg-brand/10 text-brand border-brand/25",
   };
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
         tones[tone]
       )}
     >
@@ -89,15 +93,15 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">{label}</span>
+      <span className="block text-[13px] font-medium text-muted">{label}</span>
       {children}
-      {hint && <span className="block text-[11px] text-faint">{hint}</span>}
+      {hint && <span className="block text-xs text-faint">{hint}</span>}
     </label>
   );
 }
 
 const inputBase =
-  "w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30 placeholder:text-faint";
+  "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-brand/60 focus:ring-2 focus:ring-brand/15 placeholder:text-faint";
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={clsx(inputBase, props.className)} />;
@@ -161,14 +165,16 @@ export function Segmented<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="inset flex rounded-xl p-1">
+    <div className="flex gap-1 rounded-xl border border-border bg-surface-2/60 p-1">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
           className={clsx(
-            "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition",
-            value === o.value ? "bg-brand text-slate-950 shadow-sm" : "text-muted hover:text-text"
+            "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition",
+            value === o.value
+              ? "bg-surface text-brand shadow-sm"
+              : "text-muted hover:text-text"
           )}
         >
           {o.label}
@@ -201,10 +207,10 @@ export function StatCard({
             ? "text-warn"
             : "text-text";
   return (
-    <div className="inset rounded-xl p-4">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-muted">{label}</div>
-      <div className={clsx("num mt-1 text-2xl font-black", color)}>{value}</div>
-      {sub && <div className="mt-0.5 text-[11px] text-faint">{sub}</div>}
+    <div className="rounded-xl border border-border bg-surface-2/40 px-4 py-3.5">
+      <Overline>{label}</Overline>
+      <div className={clsx("figure mt-1.5 text-2xl", color)}>{value}</div>
+      {sub && <div className="mt-0.5 text-xs text-faint">{sub}</div>}
     </div>
   );
 }
@@ -224,9 +230,9 @@ export function Modal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="card animate-fade-in relative z-10 w-full max-w-lg p-6 shadow-2xl">
-        <h3 className="mb-4 text-lg font-black text-text">{title}</h3>
+      <div className="absolute inset-0 bg-[rgb(38_35_30_/_0.45)] backdrop-blur-[2px]" onClick={onClose} />
+      <div className="card animate-fade-in relative z-10 w-full max-w-lg p-7">
+        <h3 className="mb-5 font-serif text-xl text-text">{title}</h3>
         {children}
       </div>
     </div>
@@ -244,9 +250,9 @@ export function EmptyState({
   description: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
       <div className="mb-3 text-faint">{icon}</div>
-      <p className="font-bold text-text">{title}</p>
+      <p className="font-serif text-lg text-text">{title}</p>
       <p className="mt-1 max-w-sm text-sm text-muted">{description}</p>
     </div>
   );

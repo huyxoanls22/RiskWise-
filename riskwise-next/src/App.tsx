@@ -38,19 +38,37 @@ function DisciplinePill() {
   const trades = useSelector((d) => d.trades);
   const score = computeDisciplineScore(trades);
   if (score.grade === "—") return null;
-  const color = score.tone === "pos" ? "rgb(var(--brand))" : score.tone === "warn" ? "rgb(var(--warn))" : "rgb(var(--neg))";
+  const color = score.tone === "pos" ? "rgb(var(--pos))" : score.tone === "warn" ? "rgb(var(--warn))" : "rgb(var(--neg))";
   return (
-    <div
-      className="hidden items-center gap-2 rounded-full border px-3 py-1.5 sm:flex"
-      style={{ borderColor: `color-mix(in srgb, ${color} 35%, transparent)`, background: `color-mix(in srgb, ${color} 10%, transparent)` }}
-    >
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full rounded-full" style={{ background: color, animation: "ringPulse 2s ease-in-out infinite" }} />
-        <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: color }} />
+    <div className="hidden items-center gap-2 rounded-full border border-border px-3 py-1.5 sm:flex">
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+      <span className="text-xs text-muted">
+        Kỷ luật <span className="num font-medium text-text">{score.score}</span> · {score.label}
       </span>
-      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color }}>
-        Kỷ luật {score.score} · {score.label}
-      </span>
+    </div>
+  );
+}
+
+const PRINCIPLES = [
+  "Bảo toàn vốn là ưu tiên số một — lợi nhuận đến sau.",
+  "Không bao giờ giao dịch khi đang mất bình tĩnh.",
+  "Tôn trọng kế hoạch hơn tôn trọng cái tôi.",
+  "Một lệnh thua đúng kỷ luật tốt hơn một lệnh thắng nhờ may rủi.",
+  "Rủi ro bạn nhận phải là rủi ro bạn thật sự hiểu.",
+  "Kiên nhẫn cũng là một vị thế.",
+  "Thị trường vẫn còn đó ngày mai; tài khoản thì chưa chắc.",
+];
+
+function PrincipleBanner() {
+  // Stable per calendar day so it reads like a daily creed, not random noise.
+  const idx = new Date().getDate() % PRINCIPLES.length;
+  return (
+    <div className="mx-auto max-w-6xl px-4 pt-6">
+      <p className="text-center font-serif text-[15px] italic text-muted">
+        <span className="text-brand">“</span>
+        {PRINCIPLES[idx]}
+        <span className="text-brand">”</span>
+      </p>
     </div>
   );
 }
@@ -58,17 +76,15 @@ function DisciplinePill() {
 function Header({ onSettings }: { onSettings: () => void }) {
   const theme = useSelector((d) => d.settings.theme);
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/70 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <div className="glow-brand flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-emerald-600 text-[#04140d]">
-            <ShieldCheck className="h-5 w-5" />
+    <header className="sticky top-0 z-40 border-b border-border bg-bg/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-[rgb(var(--brand-ink))]">
+            <ShieldCheck className="h-[18px] w-[18px]" />
           </div>
-          <div>
-            <h1 className="font-display text-lg font-bold leading-none tracking-tight text-text">
-              Risk<span className="text-brand">Wise</span>
-            </h1>
-            <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-faint">Discipline OS</span>
+          <div className="leading-tight">
+            <h1 className="font-serif text-xl text-text">RiskWise</h1>
+            <span className="text-[11px] text-faint">Sổ tay giao dịch kỷ luật</span>
           </div>
         </div>
 
@@ -170,31 +186,34 @@ function Shell() {
     <div className="min-h-full">
       <Header onSettings={() => setSettingsOpen(true)} />
 
-      {/* Tab navigation */}
-      <nav className="mx-auto max-w-6xl px-4 pt-5">
-        <div className="inset flex gap-1 rounded-2xl p-1">
+      <PrincipleBanner />
+
+      {/* Tab navigation — minimal underline */}
+      <nav className="mx-auto mt-6 max-w-6xl px-4">
+        <div className="flex gap-1 border-b border-border">
           {TABS.map((t) => {
             const Icon = t.icon;
+            const active = tab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={clsx(
-                  "flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
-                  tab === t.id
-                    ? "bg-gradient-to-br from-brand to-emerald-600 text-[#04140d] glow-brand"
-                    : "text-muted hover:bg-surface-2 hover:text-text"
+                  "-mb-px flex items-center gap-2 border-b-2 px-4 py-3 text-sm transition",
+                  active
+                    ? "border-brand text-text"
+                    : "border-transparent text-muted hover:text-text"
                 )}
               >
-                <Icon className="h-4 w-4" />
-                <span className="hidden font-display sm:inline">{t.label}</span>
+                <Icon className={clsx("h-4 w-4", active ? "text-brand" : "")} />
+                <span className="hidden sm:inline">{t.label}</span>
               </button>
             );
           })}
         </div>
       </nav>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-7">
         <div key={tab} className="animate-fade-in">
           {tab === "calculator" && <Calculator />}
           {tab === "portfolio" && <Portfolio />}
