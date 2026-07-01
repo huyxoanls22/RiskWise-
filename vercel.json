@@ -1,6 +1,8 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "buildCommand": "cd riskwise-next && npm install && npm run build",
+  "outputDirectory": "riskwise-next/dist",
   "rewrites": [
     {
       "source": "/api/license/verify",
