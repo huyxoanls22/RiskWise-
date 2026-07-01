@@ -281,22 +281,46 @@
             else if (item.prefix === "RW5-MTH-") label = "Gói tháng (giảm 5%)";
             else if (item.prefix === "RW-YEAR-") label = "Gói năm";
 
-            itemDiv.innerHTML = `
-              <div class="flex justify-between items-center">
-                <span class="font-bold text-amber-500 text-[10px] uppercase font-mono">${label}</span>
-                <span class="text-[9px] text-slate-500 font-mono">Hạn: ${item.expiryDate}</span>
-              </div>
-              <div class="text-[10px] text-slate-355 truncate">Email: <span class="text-white font-medium">${item.email}</span></div>
-              <div class="flex items-center gap-1.5 mt-1">
-                <input value="${item.key}" readonly class="bg-[#05070a] border border-slate-900 text-slate-400 font-mono text-[9px] px-1.5 py-0.5 rounded flex-1 select-all" type="text" />
-                <button type="button" class="btn-copy-item text-[9px] text-amber-500 hover:text-amber-400 font-bold transition cursor-pointer">
-                  Copy
-                </button>
-              </div>
-            `;
-            
+            // Build the row with DOM APIs + textContent so that user-controlled
+            // values (email, key, expiry) can never be interpreted as HTML (XSS).
+            const headerRow = document.createElement('div');
+            headerRow.className = "flex justify-between items-center";
+            const labelSpan = document.createElement('span');
+            labelSpan.className = "font-bold text-amber-500 text-[10px] uppercase font-mono";
+            labelSpan.textContent = label;
+            const expirySpan = document.createElement('span');
+            expirySpan.className = "text-[9px] text-slate-500 font-mono";
+            expirySpan.textContent = "Hạn: " + (item.expiryDate || '');
+            headerRow.appendChild(labelSpan);
+            headerRow.appendChild(expirySpan);
+
+            const emailRow = document.createElement('div');
+            emailRow.className = "text-[10px] text-slate-355 truncate";
+            emailRow.textContent = "Email: ";
+            const emailValue = document.createElement('span');
+            emailValue.className = "text-white font-medium";
+            emailValue.textContent = item.email || '';
+            emailRow.appendChild(emailValue);
+
+            const keyRow = document.createElement('div');
+            keyRow.className = "flex items-center gap-1.5 mt-1";
+            const keyInput = document.createElement('input');
+            keyInput.type = "text";
+            keyInput.readOnly = true;
+            keyInput.value = item.key || '';
+            keyInput.className = "bg-[#05070a] border border-slate-900 text-slate-400 font-mono text-[9px] px-1.5 py-0.5 rounded flex-1 select-all";
+            const copyBtn = document.createElement('button');
+            copyBtn.type = "button";
+            copyBtn.className = "btn-copy-item text-[9px] text-amber-500 hover:text-amber-400 font-bold transition cursor-pointer";
+            copyBtn.textContent = "Copy";
+            keyRow.appendChild(keyInput);
+            keyRow.appendChild(copyBtn);
+
+            itemDiv.appendChild(headerRow);
+            itemDiv.appendChild(emailRow);
+            itemDiv.appendChild(keyRow);
+
             // Add copy action
-            const copyBtn = itemDiv.querySelector('.btn-copy-item');
             copyBtn.addEventListener('click', () => {
               navigator.clipboard.writeText(item.key).then(() => {
                 copyBtn.textContent = "Ok! ✓";

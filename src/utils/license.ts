@@ -1,49 +1,14 @@
-const SECRET_SIGNING_KEY = "RISKWISE_SECURE_KEY_2026";
-
-// Simple DJB2 polynomial-like rolling hash algorithm for signature verification
-const simpleHash = (str: string): string => {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i);
-  }
-  return (hash >>> 0).toString(16).toUpperCase();
-};
-
-// Safe Unicode-compatible Base64 encoder/decoder helper
-const base64Encode = (str: string): string => {
-  try {
-    return btoa(unescape(encodeURIComponent(str)));
-  } catch {
-    return "";
-  }
-};
-
-const base64Decode = (str: string): string => {
-  try {
-    return decodeURIComponent(escape(atob(str)));
-  } catch {
-    return "";
-  }
-};
-
 /**
- * Generates a valid license key format `[Prefix][Payload]-[Signature]`
- * @param email User's registration email
- * @param expiryDate Expiration date in format YYYY-MM-DD
- * @param prefix One of the four custom prefixes
+ * Client-side license helpers.
+ *
+ * SECURITY: The signing secret and the HMAC verification live ONLY on the
+ * server (see api/_security.ts, api/license-verify.ts, api/license-generate.ts).
+ * The browser must never hold the secret, otherwise anyone could read it from
+ * the bundle and forge license keys. License generation is admin-only and is
+ * never exposed to the client.
  */
-export const generateLicenseKey = (email: string, expiryDate: string, prefix: string = "RWP-"): string => {
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanExpiry = expiryDate.trim(); // Format: YYYY-MM-DD
-  const payload = `${cleanEmail}:${cleanExpiry}`;
-  const encodedPayload = base64Encode(payload);
-  const signature = simpleHash(`${payload}:${SECRET_SIGNING_KEY}`);
-  // If prefix already has trailing hyphen, use it as is; otherwise add one
-  const safePrefix = prefix.endsWith("-") ? prefix : `${prefix}-`;
-  return `${safePrefix}${encodedPayload}-${signature}`;
-};
 
-interface LicenseVerifyResult {
+export interface LicenseVerifyResult {
   isValid: boolean;
   email?: string;
   expiryDate?: Date;
@@ -51,59 +16,32 @@ interface LicenseVerifyResult {
 }
 
 /**
- * Verifies a given license key against the provided user email
+ * Verifies a license key by delegating to the server, which holds the secret
+ * and performs the HMAC-SHA256 signature check.
  */
-export const verifyLicenseKey = (email: string, licenseKey: string): LicenseVerifyResult => {
-  const cleanEmail = email.trim().toLowerCase();
-  const trimmedKey = licenseKey.trim();
+export const verifyLicenseKey = async (
+  email: string,
+  licenseKey: string
+): Promise<LicenseVerifyResult> => {
+  try {
+    const res = await fetch("/api/license/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, licenseKey }),
+    });
 
-  // Find matching prefix
-  const supportedPrefixes = ["RW-MTH-", "RW-YEAR-", "RW5-MTH-", "RW10-YEAR-", "RWP-"];
-  let matchedPrefix = "";
-  for (const p of supportedPrefixes) {
-    if (trimmedKey.startsWith(p)) {
-      matchedPrefix = p;
-      break;
+    const data = await res.json();
+
+    if (!res.ok || !data.isValid) {
+      return { isValid: false, error: data.error || "Mã kích hoạt không hợp lệ." };
     }
+
+    return {
+      isValid: true,
+      email: data.email,
+      expiryDate: data.expiryDateString ? new Date(data.expiryDateString) : undefined,
+    };
+  } catch {
+    return { isValid: false, error: "Không thể kết nối đến máy chủ để xác thực mã kích hoạt." };
   }
-
-  if (!matchedPrefix) {
-    return { isValid: false, error: "Định dạng mã kích hoạt không hợp lệ (Phải bắt đầu bằng một tiền tố hợp lệ như RW-MTH-, RW-YEAR-, RW5-MTH- hoặc RW10-YEAR-)" };
-  }
-
-  const rest = trimmedKey.substring(matchedPrefix.length);
-  const parts = rest.split("-");
-  if (parts.length !== 2) {
-    return { isValid: false, error: "Mã kích hoạt không đúng định dạng (Thiếu thành phần)" };
-  }
-
-  const encodedPayload = parts[0];
-  const givenSignature = parts[1].toUpperCase();
-
-  const decodedPayload = base64Decode(encodedPayload);
-  if (!decodedPayload || !decodedPayload.includes(":")) {
-    return { isValid: false, error: "Không thể giải mã nội dung mã kích hoạt" };
-  }
-
-  const [payloadEmail, payloadExpiry] = decodedPayload.split(":");
-  if (payloadEmail !== cleanEmail) {
-    return { isValid: false, error: "Email của bạn không trùng khớp với thông tin ký nhận trong mã kích hoạt này!" };
-  }
-
-  // Re-verify the signature
-  const expectedSignature = simpleHash(`${decodedPayload}:${SECRET_SIGNING_KEY}`);
-  if (givenSignature !== expectedSignature) {
-    return { isValid: false, error: "Chữ ký số của mã kích hoạt đã bị giả mạo hoặc sai lệch thông tin!" };
-  }
-
-  const expiryDateObj = new Date(payloadExpiry);
-  if (isNaN(expiryDateObj.getTime())) {
-    return { isValid: false, error: "Ngày hết hạn ghi nhận trong mã không hợp lệ!" };
-  }
-
-  return {
-    isValid: true,
-    email: payloadEmail,
-    expiryDate: expiryDateObj
-  };
 };
