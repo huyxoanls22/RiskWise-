@@ -15,6 +15,7 @@ import { Brain, TrendingUp, Lightbulb, Activity } from "lucide-react";
 import { useSelector } from "../store/store";
 import { computeStats, equityCurve, emotionBreakdown, buildInsights, computeDisciplineScore } from "../lib/analytics";
 import { Card, StatCard, EmptyState, Badge } from "../components/ui";
+import { PremiumLock } from "../components/Paywall";
 import { fmtMoney, fmtPct, fmtNum } from "../lib/format";
 import { EMOTION_META } from "../lib/types";
 import DisciplineScore from "../components/DisciplineScore";
@@ -25,11 +26,23 @@ const BRAND = "#BF663D";
 
 export default function Journal() {
   const trades = useSelector((d) => d.trades);
+  const premium = useSelector((d) => d.license.premium);
+
+  // Hooks below must run unconditionally; the premium gate is checked after they're declared.
   const stats = useMemo(() => computeStats(trades), [trades]);
   const curve = useMemo(() => equityCurve(trades), [trades]);
   const emotions = useMemo(() => emotionBreakdown(trades), [trades]);
   const insights = useMemo(() => buildInsights(stats, emotions), [stats, emotions]);
   const discipline = useMemo(() => computeDisciplineScore(trades), [trades]);
+
+  if (!premium) {
+    return (
+      <PremiumLock
+        title="Phân tích kỷ luật là tính năng Premium"
+        description="Mở khoá Expert System, đường cong vốn, PnL theo cảm xúc và điểm kỷ luật dài hạn — để nhìn thẳng vào thói quen giao dịch của bạn và sửa nó."
+      />
+    );
+  }
 
   if (stats.total === 0) {
     return (

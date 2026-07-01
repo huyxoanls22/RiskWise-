@@ -1,3 +1,6 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# License signing private key — NEVER commit. Keep a secure offline backup.
+scripts/license-keypair.json

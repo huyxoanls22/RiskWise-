@@ -1,17 +1,31 @@
 import { useState } from "react";
-import { Check, Plus, Trash2, RotateCcw, ListChecks } from "lucide-react";
+import { Check, Plus, Trash2, RotateCcw, ListChecks, Pencil, FolderPlus, X, Crown } from "lucide-react";
 import { useSelector } from "../store/store";
 import { actions } from "../store/actions";
-import { Button, Badge, TextInput } from "../components/ui";
+import { MAX_CHECKLISTS } from "../lib/types";
+import { Button, Badge, TextInput, Select } from "../components/ui";
+import { usePaywall } from "../components/Paywall";
+import { useToast } from "../components/Toast";
 import { clsx } from "../lib/format";
 
 export default function Checklist() {
-  const checklist = useSelector((d) => d.checklist);
+  const checklists = useSelector((d) => d.checklists);
+  const activeId = useSelector((d) => d.activeChecklistId);
+  const premium = useSelector((d) => d.license.premium);
+  const openPaywall = usePaywall();
+  const toast = useToast();
+
+  const active = checklists.find((c) => c.id === activeId) ?? checklists[0];
+  const items = active?.items ?? [];
+
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
   const [required, setRequired] = useState(true);
+  const [creatingSet, setCreatingSet] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [setName, setSetName] = useState("");
 
-  const requiredItems = checklist.filter((c) => c.isRequired);
+  const requiredItems = items.filter((c) => c.isRequired);
   const requiredDone = requiredItems.filter((c) => c.isChecked).length;
   const allRequiredDone = requiredItems.length > 0 && requiredDone === requiredItems.length;
 
@@ -19,6 +33,31 @@ export default function Checklist() {
     actions.addChecklistItem(text, required);
     setText("");
     setAdding(false);
+  };
+
+  const startCreate = () => {
+    // Free tier is limited to a single checklist; more requires premium.
+    if (!premium) {
+      openPaywall();
+      return;
+    }
+    if (checklists.length >= MAX_CHECKLISTS) {
+      toast(`Tối đa ${MAX_CHECKLISTS} bộ checklist.`, "info");
+      return;
+    }
+    setSetName("");
+    setCreatingSet(true);
+  };
+
+  const confirmCreate = () => {
+    actions.addChecklist(setName);
+    setCreatingSet(false);
+    toast("Đã tạo bộ checklist mới.");
+  };
+
+  const confirmRename = () => {
+    actions.renameChecklist(active.id, setName);
+    setRenaming(false);
   };
 
   return (
@@ -32,8 +71,79 @@ export default function Checklist() {
         </Badge>
       </div>
 
+      {/* Checklist-set switcher */}
+      {renaming ? (
+        <div className="mb-4 flex gap-2">
+          <TextInput
+            autoFocus
+            value={setName}
+            onChange={(e) => setSetName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && confirmRename()}
+            placeholder="Tên bộ checklist"
+          />
+          <Button onClick={confirmRename}>Lưu</Button>
+          <Button variant="ghost" onClick={() => setRenaming(false)} aria-label="cancel">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : creatingSet ? (
+        <div className="mb-4 flex gap-2">
+          <TextInput
+            autoFocus
+            value={setName}
+            onChange={(e) => setSetName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && confirmCreate()}
+            placeholder="VD: Scalping M5, Swing D1…"
+          />
+          <Button onClick={confirmCreate}>Tạo</Button>
+          <Button variant="ghost" onClick={() => setCreatingSet(false)} aria-label="cancel">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <div className="mb-4 flex items-center gap-2">
+          <Select
+            value={active.id}
+            onChange={(v) => actions.setActiveChecklist(v)}
+            options={checklists.map((c) => ({ value: c.id, label: c.name }))}
+            className="flex-1"
+          />
+          <button
+            onClick={() => {
+              setSetName(active.name);
+              setRenaming(true);
+            }}
+            className="rounded-lg p-2 text-faint transition hover:bg-surface-2 hover:text-text"
+            aria-label="rename"
+            title="Đổi tên bộ"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            onClick={startCreate}
+            className="flex items-center gap-1 rounded-lg p-2 text-faint transition hover:bg-surface-2 hover:text-text"
+            aria-label="new checklist"
+            title={premium ? "Tạo bộ checklist mới" : "Tạo thêm bộ — cần Premium"}
+          >
+            {premium ? <FolderPlus className="h-4 w-4" /> : <Crown className="h-4 w-4 text-brand" />}
+          </button>
+          {checklists.length > 1 && (
+            <button
+              onClick={() => {
+                if (confirm(`Xoá bộ checklist "${active.name}"?`)) actions.deleteChecklist(active.id);
+              }}
+              className="rounded-lg p-2 text-faint transition hover:bg-surface-2 hover:text-neg"
+              aria-label="delete checklist"
+              title="Xoá bộ này"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
       <ul className="space-y-2">
-        {checklist.map((item) => (
+        {items.map((item) => (
           <li
             key={item.id}
             className={clsx(
@@ -64,6 +174,11 @@ export default function Checklist() {
             </button>
           </li>
         ))}
+        {items.length === 0 && (
+          <li className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-faint">
+            Bộ checklist này chưa có tiêu chí nào.
+          </li>
+        )}
       </ul>
 
       {adding ? (

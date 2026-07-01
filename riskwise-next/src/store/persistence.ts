@@ -1,5 +1,6 @@
-import type { AppData } from "../lib/types";
+import type { AppData, Checklist, ChecklistItem } from "../lib/types";
 import { defaultData, DATA_VERSION } from "./defaults";
+import { uid } from "../lib/format";
 
 const STORAGE_KEY = "riskwise_next_data_v1";
 
@@ -30,14 +31,39 @@ export function saveData(data: AppData): void {
 export function migrate(parsed: unknown): AppData {
   const base = defaultData();
   if (!parsed || typeof parsed !== "object") return base;
-  const p = parsed as Partial<AppData>;
+  // Legacy (v1) carried a single flat `checklist: ChecklistItem[]`.
+  const p = parsed as Partial<AppData> & { checklist?: ChecklistItem[] };
+
+  const checklists = resolveChecklists(p, base.checklists);
+  const activeChecklistId =
+    typeof p.activeChecklistId === "string" && checklists.some((c) => c.id === p.activeChecklistId)
+      ? p.activeChecklistId
+      : checklists[0].id;
+
   return {
     version: DATA_VERSION,
     setup: { ...base.setup, ...(p.setup ?? {}) },
     savedSetups: Array.isArray(p.savedSetups) ? p.savedSetups : base.savedSetups,
-    checklist: Array.isArray(p.checklist) ? p.checklist : base.checklist,
+    checklists,
+    activeChecklistId,
     trades: Array.isArray(p.trades) ? p.trades : base.trades,
     plans: Array.isArray(p.plans) ? p.plans : base.plans,
+    license: { premium: false, ...(p.license ?? {}) },
     settings: { ...base.settings, ...(p.settings ?? {}) },
   };
+}
+
+/** Accept the new `checklists` shape, or wrap a legacy flat `checklist` into one named set. */
+function resolveChecklists(
+  p: Partial<AppData> & { checklist?: ChecklistItem[] },
+  fallback: Checklist[]
+): Checklist[] {
+  if (Array.isArray(p.checklists) && p.checklists.length > 0) {
+    const valid = p.checklists.filter((c) => c && typeof c.id === "string" && Array.isArray(c.items));
+    if (valid.length > 0) return valid;
+  }
+  if (Array.isArray(p.checklist) && p.checklist.length > 0) {
+    return [{ id: uid("clist"), name: "Mặc định", items: p.checklist }];
+  }
+  return fallback;
 }

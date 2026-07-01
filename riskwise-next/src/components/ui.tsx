@@ -107,6 +107,10 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={clsx(inputBase, props.className)} />;
 }
 
+export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={clsx(inputBase, "resize-y leading-relaxed", props.className)} />;
+}
+
 export function NumberInput({
   value,
   onValue,

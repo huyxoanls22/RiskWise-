@@ -30,7 +30,7 @@ function ActiveRow({ t }: { t: PortfolioTrade }) {
           </p>
         </div>
         <div className="text-right">
-          <div className={clsx("num text-lg font-black", pnlTone)}>
+          <div className={clsx("figure text-lg", pnlTone)}>
             {pnl >= 0 ? "+" : ""}
             {fmtMoney(pnl)}
           </div>
@@ -87,7 +87,7 @@ function ClosedRow({ t }: { t: PortfolioTrade }) {
         <p className="text-[11px] text-faint">{fmtDate(t.closedAt ?? t.enteredAt)}</p>
       </div>
       <div className="flex items-center gap-3">
-        <span className={clsx("num font-black", pnl >= 0 ? "text-pos" : "text-neg")}>
+        <span className={clsx("figure", pnl >= 0 ? "text-pos" : "text-neg")}>
           {pnl >= 0 ? "+" : ""}
           {fmtMoney(pnl)}
         </span>

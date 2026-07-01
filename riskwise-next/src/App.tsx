@@ -11,6 +11,7 @@ import {
   Upload,
   Trash2,
   ShieldCheck,
+  Crown,
 } from "lucide-react";
 import { useSelector } from "./store/store";
 import { actions } from "./store/actions";
@@ -18,6 +19,8 @@ import { downloadBackup, parseImport } from "./store/io";
 import { computeDisciplineScore } from "./lib/analytics";
 import { Button, Modal, Field, NumberInput } from "./components/ui";
 import { ToastProvider, useToast } from "./components/Toast";
+import { PaywallProvider, usePaywall } from "./components/Paywall";
+import AffiliateMenu from "./components/AffiliateMenu";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { clsx } from "./lib/format";
 import Calculator from "./features/Calculator";
@@ -73,6 +76,28 @@ function PrincipleBanner() {
   );
 }
 
+function UpgradeControl() {
+  const premium = useSelector((d) => d.license.premium);
+  const openPaywall = usePaywall();
+  if (premium) {
+    return (
+      <span className="hidden items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs font-medium text-brand sm:flex">
+        <Crown className="h-3.5 w-3.5" /> Premium
+      </span>
+    );
+  }
+  return (
+    <button
+      onClick={openPaywall}
+      className="flex items-center gap-1.5 rounded-lg border border-brand/40 px-2.5 py-2 text-xs font-medium text-brand transition hover:bg-brand/10"
+      title="Mở khoá tính năng Premium"
+    >
+      <Crown className="h-3.5 w-3.5" />
+      <span className="hidden sm:inline">Nâng cấp</span>
+    </button>
+  );
+}
+
 function Header({ onSettings }: { onSettings: () => void }) {
   const theme = useSelector((d) => d.settings.theme);
   return (
@@ -91,6 +116,8 @@ function Header({ onSettings }: { onSettings: () => void }) {
         <DisciplinePill />
 
         <div className="flex items-center gap-1">
+          <AffiliateMenu />
+          <UpgradeControl />
           <button
             onClick={() => actions.setTheme(theme === "dark" ? "light" : "dark")}
             className="rounded-lg p-2 text-muted transition hover:bg-surface-2 hover:text-text"
@@ -113,6 +140,8 @@ function Header({ onSettings }: { onSettings: () => void }) {
 
 function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dailyLimit = useSelector((d) => d.settings.dailyLimitPercent);
+  const license = useSelector((d) => d.license);
+  const openPaywall = usePaywall();
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -131,9 +160,36 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Modal open={open} onClose={onClose} title="Cài đặt & dữ liệu">
       <div className="space-y-5">
-        <Field label="Giới hạn rủi ro mỗi ngày (% tài khoản)" hint="Dùng để cảnh báo khi tổng rủi ro trong ngày vượt ngưỡng">
+        <Field label="Giới hạn rủi ro mỗi ngày (% tài khoản)" hint="Khi tổng rủi ro mở trong ngày vượt ngưỡng, lệnh mới sẽ bị giữ lại cho đến khi bạn xác nhận ghi đè">
           <NumberInput value={dailyLimit} onValue={(n) => actions.setDailyLimit(n)} min={0} step={0.5} />
         </Field>
+
+        <div>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Gói</p>
+          <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2/40 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Crown className={clsx("h-4 w-4", license.premium ? "text-brand" : "text-faint")} />
+              <span className="text-sm text-text">{license.premium ? "Premium đang hoạt động" : "Bản miễn phí"}</span>
+            </div>
+            {license.premium ? (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  if (confirm("Tắt Premium trên thiết bị này?")) {
+                    actions.deactivatePremium();
+                    toast("Đã tắt Premium.");
+                  }
+                }}
+              >
+                Tắt
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={openPaywall}>
+                <Crown className="h-4 w-4" /> Nâng cấp
+              </Button>
+            )}
+          </div>
+        </div>
 
         <div>
           <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Sao lưu & khôi phục</p>
@@ -235,7 +291,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <Shell />
+        <PaywallProvider>
+          <Shell />
+        </PaywallProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

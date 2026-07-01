@@ -83,6 +83,23 @@ export interface ChecklistItem {
   isRequired: boolean;
 }
 
+/** A named set of pre-trade criteria. Free users get one; premium up to MAX_CHECKLISTS. */
+export interface Checklist {
+  id: string;
+  name: string;
+  items: ChecklistItem[];
+}
+
+/** Client-side premium entitlement (local-first; no server verification). */
+export interface License {
+  premium: boolean;
+  key?: string;
+  name?: string;
+  email?: string;
+  plan?: "monthly" | "yearly";
+  activatedAt?: string;
+}
+
 export interface PortfolioTrade {
   id: string;
   ticker: string;
@@ -102,6 +119,8 @@ export interface PortfolioTrade {
   notes?: string;
   emotion?: Emotion;
   followedChecklist: boolean;
+  /** False when the trade was entered despite exceeding the daily risk limit. Undefined = legacy/within limit. */
+  withinDailyLimit?: boolean;
 }
 
 export interface TradingPlan {
@@ -120,14 +139,19 @@ export interface TradingPlan {
   createdAt: string;
 }
 
+/** Free users are limited to a single checklist; premium unlocks up to this many. */
+export const MAX_CHECKLISTS = 5;
+
 /** Everything we persist, in one serializable shape (for storage + import/export). */
 export interface AppData {
   version: number;
   setup: TradeSetup;
   savedSetups: SavedSetup[];
-  checklist: ChecklistItem[];
+  checklists: Checklist[];
+  activeChecklistId: string;
   trades: PortfolioTrade[];
   plans: TradingPlan[];
+  license: License;
   settings: {
     theme: "dark" | "light";
     dailyLimitPercent: number;

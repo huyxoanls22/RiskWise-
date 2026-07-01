@@ -63,7 +63,9 @@ export function computeStats(trades: PortfolioTrade[]): JournalStats {
     maxLossStreak = Math.max(maxLossStreak, curLoss);
   }
 
-  const disciplined = c.filter((t) => t.followedChecklist).length;
+  // A trade counts as "disciplined" only if it followed the checklist AND stayed
+  // within the daily risk limit (legacy trades without the flag are treated as within).
+  const disciplined = c.filter((t) => t.followedChecklist && t.withinDailyLimit !== false).length;
   const pnls = c.map(pnlOf);
 
   return {
@@ -84,6 +86,21 @@ export function computeStats(trades: PortfolioTrade[]): JournalStats {
     maxLossStreak,
     disciplineRate: total ? (disciplined / total) * 100 : 0,
   };
+}
+
+/**
+ * Total risk (in account currency) committed to trades opened *today* — active or
+ * closed. Used to enforce the daily risk limit: a new entry must not push the day's
+ * cumulative risk past `dailyLimitPercent` of the account balance.
+ */
+export function riskUsedToday(trades: PortfolioTrade[], now: Date = new Date()): number {
+  const today = now.toDateString();
+  return trades
+    .filter((t) => {
+      const d = new Date(t.enteredAt);
+      return !isNaN(d.getTime()) && d.toDateString() === today;
+    })
+    .reduce((s, t) => s + (t.riskAmount > 0 ? t.riskAmount : 0), 0);
 }
 
 /** Cumulative equity curve (net PnL over time) from closed trades. */

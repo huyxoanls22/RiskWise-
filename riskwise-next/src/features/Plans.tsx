@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ClipboardList, Plus, Trash2, Star, Target } from "lucide-react";
 import { useSelector } from "../store/store";
 import { actions } from "../store/actions";
-import { Card, Field, TextInput, NumberInput, Select, Segmented, Button, Badge, EmptyState } from "../components/ui";
+import { Card, Field, TextInput, Textarea, NumberInput, Select, Segmented, Button, Badge, EmptyState } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { fmtNum, fmtDate, clsx } from "../lib/format";
 import type { AssetClass, Direction, TradingPlan } from "../lib/types";
@@ -49,7 +49,7 @@ export default function Plans() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-base font-black text-text">
+        <h2 className="flex items-center gap-2 font-serif text-xl text-text">
           <ClipboardList className="h-5 w-5 text-brand" /> Kế hoạch giao dịch
         </h2>
         <Button onClick={() => setOpen((v) => !v)}>
@@ -111,11 +111,10 @@ export default function Plans() {
             </div>
             <div className="sm:col-span-2">
               <Field label="Ghi chú / luận điểm">
-                <textarea
+                <Textarea
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   rows={3}
-                  className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-sm text-text outline-none focus:border-brand focus:ring-2 focus:ring-brand/30"
                   placeholder="Vì sao đây là cơ hội tốt? Điều kiện vào lệnh…"
                 />
               </Field>

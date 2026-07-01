@@ -1,42 +1,57 @@
 import { useMemo, useState } from "react";
-import { Calculator as CalcIcon, TrendingUp, TrendingDown, PlusCircle, AlertTriangle } from "lucide-react";
+import { Calculator as CalcIcon, TrendingUp, TrendingDown, PlusCircle, AlertTriangle, ShieldAlert, Lock } from "lucide-react";
 import { useSelector } from "../store/store";
 import { actions } from "../store/actions";
 import { calculatePositionSize, riskAmountOf } from "../lib/calculator";
+import { riskUsedToday } from "../lib/analytics";
 import { FOREX_PAIRS } from "../lib/forex";
 import { EMOTIONS } from "../lib/types";
 import type { Emotion } from "../lib/types";
-import { Card, Field, NumberInput, TextInput, Select, Segmented, Button, StatCard, Badge } from "../components/ui";
+import { Card, Field, NumberInput, TextInput, Select, Segmented, Button, StatCard, Badge, Modal } from "../components/ui";
 import { useToast } from "../components/Toast";
-import { fmtMoney, fmtNum } from "../lib/format";
+import { fmtMoney, fmtNum, fmtPct } from "../lib/format";
 import RiskMeter from "../components/RiskMeter";
 import Checklist from "./Checklist";
 import SavedSetups from "./SavedSetups";
 
 export default function Calculator() {
   const setup = useSelector((d) => d.setup);
-  const checklist = useSelector((d) => d.checklist);
+  const activeChecklist = useSelector((d) => d.checklists.find((c) => c.id === d.activeChecklistId));
+  const trades = useSelector((d) => d.trades);
+  const dailyLimitPercent = useSelector((d) => d.settings.dailyLimitPercent);
   const toast = useToast();
   const [cryptoTicker, setCryptoTicker] = useState("BTC/USDT");
   const [emotion, setEmotion] = useState<Emotion>("calm");
+  const [overrideOpen, setOverrideOpen] = useState(false);
 
   const result = useMemo(() => calculatePositionSize(setup), [setup]);
   const riskAmount = riskAmountOf(setup);
   const riskPct = setup.accountBalance > 0 ? (riskAmount / setup.accountBalance) * 100 : 0;
   const isForex = setup.assetClass === "forex";
 
-  const requiredItems = checklist.filter((c) => c.isRequired);
+  const items = activeChecklist?.items ?? [];
+  const requiredItems = items.filter((c) => c.isRequired);
   const requiredDone = requiredItems.filter((c) => c.isChecked).length;
   const checklistComplete = requiredItems.length === 0 || requiredDone === requiredItems.length;
+
+  // Daily risk limit: a new entry must not push today's cumulative risk past the limit.
+  const usedToday = riskUsedToday(trades);
+  const projectedRiskPct =
+    setup.accountBalance > 0 ? ((usedToday + result.riskAmount) / setup.accountBalance) * 100 : 0;
+  const exceedsDaily = dailyLimitPercent > 0 && result.riskAmount > 0 && projectedRiskPct > dailyLimitPercent;
+
+  const violations = [
+    !checklistComplete &&
+      `Checklist "${activeChecklist?.name ?? ""}" chưa đủ điều kiện bắt buộc (${requiredDone}/${requiredItems.length}).`,
+    exceedsDaily &&
+      `Rủi ro trong ngày sẽ lên ${fmtPct(projectedRiskPct, 2)} — vượt giới hạn ${fmtPct(dailyLimitPercent, 1)}/ngày.`,
+  ].filter(Boolean) as string[];
 
   const rr = result.riskRewardRatio;
   const rrTone = rr === undefined ? "neutral" : rr >= 2 ? "pos" : rr >= 1 ? "warn" : "neg";
 
-  const addToPortfolio = () => {
-    if (result.positionSizeUnits <= 0) {
-      toast("Chưa đủ dữ liệu để mở vị thế.", "error");
-      return;
-    }
+  /** Actually commit the trade. `overridden` records that discipline was breached. */
+  const commitTrade = (overridden: boolean) => {
     const ticker = isForex ? setup.forexPair : cryptoTicker.trim() || "—";
     const entry = isForex ? 0 : setup.entryPrice;
     const stop = isForex ? 0 : setup.stopLossPrice;
@@ -54,8 +69,27 @@ export default function Calculator() {
       takeProfit: tp || undefined,
       emotion,
       followedChecklist: checklistComplete,
+      withinDailyLimit: !exceedsDaily,
     });
-    toast(checklistComplete ? "Đã thêm vị thế vào danh mục." : "Đã thêm — nhưng checklist chưa đủ điều kiện!", checklistComplete ? "success" : "info");
+    setOverrideOpen(false);
+    if (overridden) {
+      toast("Đã vào lệnh dù vi phạm kỷ luật — lần này được ghi lại và làm giảm điểm kỷ luật.", "info");
+    } else {
+      toast("Đã thêm vị thế vào danh mục.", "success");
+    }
+  };
+
+  const addToPortfolio = () => {
+    if (result.positionSizeUnits <= 0) {
+      toast("Chưa đủ dữ liệu để mở vị thế.", "error");
+      return;
+    }
+    // Enforcement: block on any discipline violation, requiring a deliberate override.
+    if (violations.length > 0) {
+      setOverrideOpen(true);
+      return;
+    }
+    commitTrade(false);
   };
 
   return (
@@ -63,8 +97,8 @@ export default function Calculator() {
       {/* Inputs */}
       <div className="space-y-5 lg:col-span-7">
         <Card>
-          <h2 className="mb-5 flex items-center gap-2 text-base font-black text-text">
-            <CalcIcon className="h-5 w-5 text-brand" /> Tính khối lượng vị thế
+          <h2 className="mb-5 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted">
+            <CalcIcon className="h-4 w-4 text-brand" /> Tính khối lượng vị thế
           </h2>
 
           <div className="space-y-4">
@@ -204,8 +238,33 @@ export default function Calculator() {
             </div>
           )}
 
-          <Button className="mt-4 w-full" onClick={addToPortfolio}>
-            <PlusCircle className="h-4 w-4" /> Thêm vào danh mục
+          {violations.length > 0 && (
+            <div className="mt-4 space-y-1.5 rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">
+              <div className="flex items-center gap-2 font-semibold">
+                <ShieldAlert className="h-4 w-4 shrink-0" /> Kỷ luật chưa đạt — lệnh đang bị giữ lại
+              </div>
+              <ul className="ml-6 list-disc space-y-0.5">
+                {violations.map((v) => (
+                  <li key={v}>{v}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <Button
+            className="mt-4 w-full"
+            variant={violations.length > 0 ? "outline" : "primary"}
+            onClick={addToPortfolio}
+          >
+            {violations.length > 0 ? (
+              <>
+                <Lock className="h-4 w-4" /> Cần xác nhận để vào lệnh
+              </>
+            ) : (
+              <>
+                <PlusCircle className="h-4 w-4" /> Thêm vào danh mục
+              </>
+            )}
           </Button>
         </Card>
       </div>
@@ -216,6 +275,35 @@ export default function Calculator() {
         <Checklist />
         <SavedSetups />
       </div>
+
+      <Modal open={overrideOpen} onClose={() => setOverrideOpen(false)} title="Vào lệnh dù chưa đủ kỷ luật?">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border border-warn/30 bg-warn/10 p-3.5 text-sm text-warn">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+            <div className="space-y-1">
+              <p className="font-semibold text-text">Bạn đang phá vỡ quy tắc của chính mình:</p>
+              <ul className="list-disc space-y-0.5 pl-4">
+                {violations.map((v) => (
+                  <li key={v}>{v}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p className="text-sm text-muted">
+            Hầu hết tài khoản cháy không vì phân tích sai, mà vì những lần “chỉ một lệnh này thôi”. Nếu vẫn vào,
+            lệnh sẽ được đánh dấu là <span className="font-medium text-text">vi phạm kỷ luật</span> và làm giảm điểm
+            kỷ luật của bạn ở tab Phân tích.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => setOverrideOpen(false)}>
+              Quay lại, làm đúng quy tắc
+            </Button>
+            <Button variant="danger" onClick={() => commitTrade(true)}>
+              <ShieldAlert className="h-4 w-4" /> Tôi hiểu rủi ro, vẫn vào lệnh
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

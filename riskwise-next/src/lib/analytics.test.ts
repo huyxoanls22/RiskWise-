@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeDisciplineScore, computeStats } from "./analytics";
+import { computeDisciplineScore, computeStats, riskUsedToday } from "./analytics";
 import type { PortfolioTrade } from "./types";
 
 const trade = (over: Partial<PortfolioTrade>): PortfolioTrade => ({
@@ -66,5 +66,38 @@ describe("computeStats sanity", () => {
     expect(stats.wins).toBe(1);
     expect(stats.losses).toBe(1);
     expect(stats.netPnl).toBe(60);
+  });
+
+  it("treats a daily-limit override as undisciplined even when the checklist was followed", () => {
+    const within = computeStats([trade({ followedChecklist: true, withinDailyLimit: true })]);
+    const over = computeStats([trade({ followedChecklist: true, withinDailyLimit: false })]);
+    expect(within.disciplineRate).toBe(100);
+    expect(over.disciplineRate).toBe(0);
+  });
+
+  it("treats legacy trades without the withinDailyLimit flag as within the limit", () => {
+    const stats = computeStats([trade({ followedChecklist: true, withinDailyLimit: undefined })]);
+    expect(stats.disciplineRate).toBe(100);
+  });
+});
+
+describe("riskUsedToday", () => {
+  const now = new Date("2026-06-30T10:00:00");
+
+  it("sums risk only for trades entered today (active or closed)", () => {
+    const trades = [
+      trade({ enteredAt: now.toISOString(), riskAmount: 100, status: "active" }),
+      trade({ enteredAt: now.toISOString(), riskAmount: 50, status: "won" }),
+      trade({ enteredAt: "2026-06-29T10:00:00", riskAmount: 999, status: "won" }), // yesterday
+    ];
+    expect(riskUsedToday(trades, now)).toBe(150);
+  });
+
+  it("ignores invalid dates and non-positive risk", () => {
+    const trades = [
+      trade({ enteredAt: "not-a-date", riskAmount: 100 }),
+      trade({ enteredAt: now.toISOString(), riskAmount: -5 }),
+    ];
+    expect(riskUsedToday(trades, now)).toBe(0);
   });
 });

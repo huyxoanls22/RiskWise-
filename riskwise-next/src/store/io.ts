@@ -52,9 +52,12 @@ export function parseImport(raw: string): AppData {
     "version",
     "setup",
     "savedSetups",
-    "checklist",
+    "checklist", // legacy v1 — migrate() wraps it into checklists
+    "checklists",
+    "activeChecklistId",
     "trades",
     "plans",
+    "license",
     "settings",
   ]);
   for (const key of Object.keys(parsed)) {
