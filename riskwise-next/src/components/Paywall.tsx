@@ -22,8 +22,24 @@ const BANK_INFO = {
 const SUPPORT_CONTACT = "adminriskwise@gmail.com";
 
 const PLANS = {
-  yearly: { label: "Gói năm", price: "1.999.000đ", amount: 1999000, note: "~167.000đ/tháng · tiết kiệm 16%", best: true },
-  monthly: { label: "Gói tháng", price: "199.000đ", amount: 199000, note: "gia hạn từng tháng", best: false },
+  yearly: {
+    label: "Gói năm",
+    price: "1.999.000đ",
+    amount: 1999000,
+    strike: "2.388.000đ", // 12 × giá tháng
+    badge: "Tiết kiệm 16%",
+    note: "~167.000đ/tháng",
+    best: true,
+  },
+  monthly: {
+    label: "Gói tháng",
+    price: "199.000đ",
+    amount: 199000,
+    strike: null,
+    badge: null,
+    note: "gia hạn từng tháng",
+    best: false,
+  },
 } as const;
 type PlanId = keyof typeof PLANS;
 
@@ -174,9 +190,15 @@ function PaywallModal({ onClose }: { onClose: () => void }) {
                       onClick={() => setPlan(id)}
                       className={clsx(
                         "relative flex w-full items-center justify-between rounded-xl border p-3 text-left transition",
-                        active ? "border-brand bg-brand/5" : "border-border hover:border-border-strong"
+                        active ? "border-brand bg-brand/5 shadow-sm" : "border-border hover:border-border-strong",
+                        p.best && "ring-1 ring-brand/20"
                       )}
                     >
+                      {p.badge && (
+                        <span className="absolute -top-2 right-3 rounded-full bg-brand px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[rgb(var(--brand-ink))] shadow-sm">
+                          {p.badge}
+                        </span>
+                      )}
                       <div className="flex items-center gap-3">
                         <span
                           className={clsx(
@@ -191,7 +213,10 @@ function PaywallModal({ onClose }: { onClose: () => void }) {
                           <p className="text-[11px] text-faint">{p.note}</p>
                         </div>
                       </div>
-                      <span className="figure text-sm text-brand">{p.price}</span>
+                      <div className="text-right leading-tight">
+                        {p.strike && <div className="text-[10px] text-faint line-through">{p.strike}</div>}
+                        <div className="figure text-lg font-semibold text-brand">{p.price}</div>
+                      </div>
                     </button>
                   );
                 })}
