@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Calculator as CalcIcon, TrendingUp, TrendingDown, PlusCircle, AlertTriangle, ShieldAlert, Lock } from "lucide-react";
 import { useSelector } from "../store/store";
 import { actions } from "../store/actions";
@@ -33,6 +33,16 @@ export default function Calculator() {
   const requiredItems = items.filter((c) => c.isRequired);
   const requiredDone = requiredItems.filter((c) => c.isChecked).length;
   const checklistComplete = requiredItems.length === 0 || requiredDone === requiredItems.length;
+
+  // Discipline: changing the instrument (forex pair or crypto/stock ticker) clears the
+  // checklist, so it must be re-verified from scratch before every trade.
+  const instrument = isForex ? setup.forexPair : cryptoTicker.trim().toUpperCase();
+  const lastInstrument = useRef(instrument);
+  useEffect(() => {
+    if (lastInstrument.current === instrument) return;
+    lastInstrument.current = instrument;
+    actions.resetChecklist();
+  }, [instrument]);
 
   // Daily risk limit: a new entry must not push today's cumulative risk past the limit.
   const usedToday = riskUsedToday(trades);
