@@ -1,16 +1,15 @@
 import React, { createContext, useContext, useState } from "react";
-import { Crown, Check, ShieldCheck, Copy, QrCode, X, KeyRound, Sparkles } from "lucide-react";
-import { useSelector } from "../store/store";
-import { actions } from "../store/actions";
+import { Crown, Check, ShieldCheck, Copy, QrCode, X, Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "./Toast";
-import { Button, TextInput, Field, Badge } from "./ui";
-import { verifyLicense } from "../lib/license";
+import { useAuth } from "./AuthProvider";
+import { usePremium } from "./PremiumProvider";
+import { Button, Badge } from "./ui";
 import { clsx } from "../lib/format";
 
 /**
- * Client-side premium gate. There is no server: "activation" simply flips a local
- * entitlement flag. Faithful to the original app's manual VietQR + key flow, but
- * restyled to the calm handbook aesthetic. Edit BANK_INFO for your real account.
+ * Premium is server-owned (public.profiles.tier). This modal collects payment and
+ * tells the buyer what to do; an admin then flips their tier. There is no self-serve
+ * activation on the client. Edit BANK_INFO / SUPPORT_CONTACT for your real details.
  */
 const BANK_INFO = {
   bank: "Techcombank",
@@ -19,13 +18,21 @@ const BANK_INFO = {
   holder: "BE QUANG HUY",
 };
 
-// Where buyers send their receipt + email to receive an activation key.
+// Where buyers send their receipt so you can activate their account.
 const SUPPORT_CONTACT = "adminriskwise@gmail.com";
 
 const PLANS = {
   yearly: { label: "Gói năm", price: "999.000đ", amount: 999000, note: "~83.000đ/tháng · tiết kiệm 58%", best: true },
   monthly: { label: "Gói tháng", price: "199.000đ", amount: 199000, note: "gia hạn từng tháng", best: false },
 } as const;
+type PlanId = keyof typeof PLANS;
+
+const PERKS = [
+  "Mở khoá tab Phân tích kỷ luật nâng cao (Expert System, equity curve, PnL theo cảm xúc)",
+  "Tạo tối đa 5 bộ checklist tuỳ biến cho từng chiến lược",
+  "Theo dõi điểm kỷ luật dài hạn để sửa thói quen giao dịch",
+  "Dữ liệu đồng bộ an toàn trên tài khoản, không quảng cáo",
+];
 
 /** Live, scannable VietQR (amount + memo pre-filled) via img.vietqr.io, with a graceful fallback. */
 function VietQr({ amount, memo }: { amount: number; memo: string }) {
@@ -49,14 +56,6 @@ function VietQr({ amount, memo }: { amount: number; memo: string }) {
     />
   );
 }
-type PlanId = keyof typeof PLANS;
-
-const PERKS = [
-  "Mở khoá tab Phân tích kỷ luật nâng cao (Expert System, equity curve, PnL theo cảm xúc)",
-  "Tạo tối đa 5 bộ checklist tuỳ biến cho từng chiến lược",
-  "Theo dõi điểm kỷ luật dài hạn để sửa thói quen giao dịch",
-  "Ủng hộ một công cụ độc lập, không quảng cáo, dữ liệu nằm trên máy bạn",
-];
 
 const PaywallCtx = createContext<() => void>(() => {});
 export const usePaywall = () => useContext(PaywallCtx);
@@ -86,22 +85,21 @@ export function PremiumLock({ title, description }: { title: string; description
       <Button onClick={openPaywall}>
         <Crown className="h-4 w-4" /> Mở khoá Premium
       </Button>
-      <p className="text-[11px] text-faint">Từ 199.000đ · kích hoạt ngay trên máy bạn</p>
+      <p className="text-[11px] text-faint">Từ 199.000đ · kích hoạt theo tài khoản của bạn</p>
     </div>
   );
 }
 
 function PaywallModal({ onClose }: { onClose: () => void }) {
-  const premium = useSelector((d) => d.license.premium);
+  const { premium, refresh } = usePremium();
+  const { user } = useAuth();
   const toast = useToast();
   const [plan, setPlan] = useState<PlanId>("yearly");
-  const [tab, setTab] = useState<"activate" | "transfer">("activate");
-  const [email, setEmail] = useState("");
-  const [key, setKey] = useState("");
-  const [verifying, setVerifying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  const memo = `RISKWISE ${plan.toUpperCase()} ${(email.trim() || "EMAIL").toUpperCase()}`;
+  const email = user?.email ?? "";
+  const memo = `RISKWISE ${plan.toUpperCase()} ${email.toUpperCase()}`;
 
   const copyMemo = () => {
     navigator.clipboard?.writeText(memo);
@@ -109,24 +107,11 @@ function PaywallModal({ onClose }: { onClose: () => void }) {
     setTimeout(() => setCopied(false), 1800);
   };
 
-  // Unlock requires an email + key that cryptographically match (see lib/license.ts).
-  const activate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !key.trim()) {
-      toast("Nhập email và key kích hoạt.", "error");
-      return;
-    }
-    setVerifying(true);
-    const ok = await verifyLicense(cleanEmail, key);
-    setVerifying(false);
-    if (!ok) {
-      toast("Email và key không khớp. Hãy nhập đúng email bạn đã dùng khi mua.", "error");
-      return;
-    }
-    actions.activatePremium({ key: key.trim(), email: cleanEmail.toLowerCase(), plan });
-    toast("Đã kích hoạt Premium. Cảm ơn bạn!", "success");
-    onClose();
+  const recheck = async () => {
+    setChecking(true);
+    await refresh();
+    setChecking(false);
+    toast("Đã kiểm tra. Nếu đã kích hoạt, Premium sẽ mở khoá ngay.", "info");
   };
 
   return (
@@ -146,9 +131,7 @@ function PaywallModal({ onClose }: { onClose: () => void }) {
           <Badge tone="brand">
             <Crown className="h-3.5 w-3.5" /> RiskWise Premium
           </Badge>
-          <h2 className="font-serif text-2xl text-text">
-            Mở khoá bộ não phân tích kỷ luật
-          </h2>
+          <h2 className="font-serif text-2xl text-text">Mở khoá bộ não phân tích kỷ luật</h2>
           <p className="text-sm leading-relaxed text-muted">
             Bản miễn phí giúp bạn dựng thói quen ghi chép và quản trị rủi ro. Bản Premium mở khoá phần phân
             tích hành vi để bạn nhìn thẳng vào kỷ luật của chính mình — và sửa nó.
@@ -214,79 +197,38 @@ function PaywallModal({ onClose }: { onClose: () => void }) {
                 })}
               </div>
 
-              {/* Tabs: activate (email+key) vs transfer instructions */}
-              <div className="flex gap-1 rounded-xl border border-border bg-surface p-1">
-                <button
-                  onClick={() => setTab("activate")}
-                  className={clsx(
-                    "flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition",
-                    tab === "activate" ? "bg-surface-2 text-text" : "text-muted hover:text-text"
-                  )}
-                >
-                  Nhập key
-                </button>
-                <button
-                  onClick={() => setTab("transfer")}
-                  className={clsx(
-                    "flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition",
-                    tab === "transfer" ? "bg-surface-2 text-text" : "text-muted hover:text-text"
-                  )}
-                >
-                  Cách mua
-                </button>
+              {/* Payment */}
+              <div className="rounded-xl border border-dashed border-border-strong bg-surface p-3 text-center">
+                <div className="mb-2 flex items-center justify-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+                  <QrCode className="h-3.5 w-3.5" /> Quét VietQR / chuyển khoản
+                </div>
+                <VietQr amount={PLANS[plan].amount} memo={memo} />
+                <p className="num text-[11px] leading-relaxed text-muted">
+                  {BANK_INFO.bank} · <span className="text-text">{BANK_INFO.account}</span>
+                  <br />
+                  {BANK_INFO.holder} · <span className="text-brand">{PLANS[plan].price}</span>
+                </p>
+                <div className="mt-2 flex items-center justify-center gap-1.5">
+                  <span className="num select-all rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text">{memo}</span>
+                  <button type="button" onClick={copyMemo} className="text-faint hover:text-brand" title="Sao chép nội dung CK">
+                    {copied ? <Check className="h-3.5 w-3.5 text-pos" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
               </div>
 
-              {tab === "activate" ? (
-                <form onSubmit={activate} className="space-y-3">
-                  <Field label="Email" hint="Đúng email bạn đã dùng khi mua — key gắn với email này.">
-                    <TextInput
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="email@gmail.com"
-                    />
-                  </Field>
-                  <Field label="Key kích hoạt">
-                    <TextInput value={key} onChange={(e) => setKey(e.target.value)} placeholder="RWP1-…" />
-                  </Field>
-                  <Button type="submit" className="w-full" disabled={verifying}>
-                    <KeyRound className="h-4 w-4" /> {verifying ? "Đang kiểm tra…" : "Kích hoạt Premium"}
-                  </Button>
-                  <p className="text-center text-[10px] text-faint">
-                    Kiểm tra ngay trên máy · không gửi dữ liệu đi đâu
-                  </p>
-                </form>
-              ) : (
-                <div className="space-y-3">
-                  <div className="rounded-xl border border-dashed border-border-strong bg-surface p-3 text-center">
-                    <div className="mb-2 flex items-center justify-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
-                      <QrCode className="h-3.5 w-3.5" /> Quét VietQR / chuyển khoản
-                    </div>
-                    <VietQr amount={PLANS[plan].amount} memo={memo} />
-                    <p className="num text-[11px] leading-relaxed text-muted">
-                      {BANK_INFO.bank} · <span className="text-text">{BANK_INFO.account}</span>
-                      <br />
-                      {BANK_INFO.holder} · <span className="text-brand">{PLANS[plan].price}</span>
-                    </p>
-                    <div className="mt-2 flex items-center justify-center gap-1.5">
-                      <span className="num select-all rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text">
-                        {memo}
-                      </span>
-                      <button type="button" onClick={copyMemo} className="text-faint hover:text-brand" title="Sao chép nội dung CK">
-                        {copied ? <Check className="h-3.5 w-3.5 text-pos" /> : <Copy className="h-3.5 w-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <ol className="list-decimal space-y-1 pl-4 text-[11px] leading-relaxed text-muted">
-                    <li>Chuyển khoản đúng số tiền, ghi nội dung như trên (kèm email của bạn).</li>
-                    <li>
-                      Gửi biên lai + email tới <span className="text-text">{SUPPORT_CONTACT}</span> để nhận
-                      <span className="text-text"> key kích hoạt</span>.
-                    </li>
-                    <li>Mở tab “Nhập key”, nhập email + key để mở khoá.</li>
-                  </ol>
-                </div>
-              )}
+              <ol className="list-decimal space-y-1 pl-4 text-[11px] leading-relaxed text-muted">
+                <li>Chuyển khoản đúng số tiền, giữ nguyên nội dung (đã kèm email tài khoản của bạn).</li>
+                <li>
+                  Gửi biên lai tới <span className="text-text">{SUPPORT_CONTACT}</span>. Tài khoản{" "}
+                  <span className="text-text">{email}</span> sẽ được nâng cấp trong ít phút.
+                </li>
+                <li>Bấm nút bên dưới để tải lại trạng thái sau khi được kích hoạt.</li>
+              </ol>
+
+              <Button variant="outline" className="w-full" onClick={recheck} disabled={checking}>
+                {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Tôi đã thanh toán — Kiểm tra lại
+              </Button>
             </div>
           )}
         </div>

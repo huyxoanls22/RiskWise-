@@ -12,6 +12,8 @@ import {
   Trash2,
   ShieldCheck,
   Crown,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { useSelector } from "./store/store";
 import { actions } from "./store/actions";
@@ -20,6 +22,10 @@ import { computeDisciplineScore } from "./lib/analytics";
 import { Button, Modal, Field, NumberInput } from "./components/ui";
 import { ToastProvider, useToast } from "./components/Toast";
 import { PaywallProvider, usePaywall } from "./components/Paywall";
+import { AuthProvider, useAuth, authActions } from "./components/AuthProvider";
+import { PremiumProvider, usePremium } from "./components/PremiumProvider";
+import AuthScreen from "./components/AuthScreen";
+import { CloudSyncGate } from "./components/CloudSync";
 import AffiliateMenu from "./components/AffiliateMenu";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { clsx } from "./lib/format";
@@ -77,7 +83,7 @@ function PrincipleBanner() {
 }
 
 function UpgradeControl() {
-  const premium = useSelector((d) => d.license.premium);
+  const { premium } = usePremium();
   const openPaywall = usePaywall();
   if (premium) {
     return (
@@ -140,8 +146,9 @@ function Header({ onSettings }: { onSettings: () => void }) {
 
 function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dailyLimit = useSelector((d) => d.settings.dailyLimitPercent);
-  const license = useSelector((d) => d.license);
+  const { premium } = usePremium();
   const openPaywall = usePaywall();
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -160,6 +167,22 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Modal open={open} onClose={onClose} title="Cài đặt & dữ liệu">
       <div className="space-y-5">
+        <div>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Tài khoản</p>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2/40 px-4 py-3">
+            <span className="truncate text-sm text-text">{user?.email ?? "—"}</span>
+            <Button
+              variant="ghost"
+              onClick={async () => {
+                await authActions.signOut();
+                onClose();
+              }}
+            >
+              <LogOut className="h-4 w-4" /> Đăng xuất
+            </Button>
+          </div>
+        </div>
+
         <Field label="Giới hạn rủi ro mỗi ngày (% tài khoản)" hint="Khi tổng rủi ro mở trong ngày vượt ngưỡng, lệnh mới sẽ bị giữ lại cho đến khi bạn xác nhận ghi đè">
           <NumberInput value={dailyLimit} onValue={(n) => actions.setDailyLimit(n)} min={0} step={0.5} />
         </Field>
@@ -168,22 +191,10 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
           <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Gói</p>
           <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2/40 px-4 py-3">
             <div className="flex items-center gap-2">
-              <Crown className={clsx("h-4 w-4", license.premium ? "text-brand" : "text-faint")} />
-              <span className="text-sm text-text">{license.premium ? "Premium đang hoạt động" : "Bản miễn phí"}</span>
+              <Crown className={clsx("h-4 w-4", premium ? "text-brand" : "text-faint")} />
+              <span className="text-sm text-text">{premium ? "Premium đang hoạt động" : "Bản miễn phí"}</span>
             </div>
-            {license.premium ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  if (confirm("Tắt Premium trên thiết bị này?")) {
-                    actions.deactivatePremium();
-                    toast("Đã tắt Premium.");
-                  }
-                }}
-              >
-                Tắt
-              </Button>
-            ) : (
+            {!premium && (
               <Button variant="outline" onClick={openPaywall}>
                 <Crown className="h-4 w-4" /> Nâng cấp
               </Button>
@@ -279,7 +290,7 @@ function Shell() {
       </main>
 
       <footer className="mx-auto max-w-6xl px-4 pb-8 pt-4 text-center text-[11px] text-faint">
-        RiskWise Next · Dữ liệu lưu cục bộ trên trình duyệt của bạn · Không phải lời khuyên đầu tư
+        RiskWise Next · Dữ liệu đồng bộ an toàn trên tài khoản của bạn · Không phải lời khuyên đầu tư
       </footer>
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -287,13 +298,36 @@ function Shell() {
   );
 }
 
+function AuthGate() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted" />
+      </div>
+    );
+  }
+  if (!session) return <AuthScreen />;
+
+  return (
+    <PremiumProvider>
+      <PaywallProvider>
+        <CloudSyncGate>
+          <Shell />
+        </CloudSyncGate>
+      </PaywallProvider>
+    </PremiumProvider>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <PaywallProvider>
-          <Shell />
-        </PaywallProvider>
+        <AuthProvider>
+          <AuthGate />
+        </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

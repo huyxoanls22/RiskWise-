@@ -16,6 +16,7 @@ import { useSelector } from "../store/store";
 import { computeStats, equityCurve, emotionBreakdown, buildInsights, computeDisciplineScore } from "../lib/analytics";
 import { Card, StatCard, EmptyState, Badge } from "../components/ui";
 import { PremiumLock } from "../components/Paywall";
+import { usePremium } from "../components/PremiumProvider";
 import { fmtMoney, fmtPct, fmtNum } from "../lib/format";
 import { EMOTION_META } from "../lib/types";
 import DisciplineScore from "../components/DisciplineScore";
@@ -26,7 +27,7 @@ const BRAND = "#BF663D";
 
 export default function Journal() {
   const trades = useSelector((d) => d.trades);
-  const premium = useSelector((d) => d.license.premium);
+  const { premium } = usePremium();
 
   // Hooks below must run unconditionally; the premium gate is checked after they're declared.
   const stats = useMemo(() => computeStats(trades), [trades]);

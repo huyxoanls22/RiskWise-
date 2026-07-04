@@ -5,13 +5,14 @@ import { actions } from "../store/actions";
 import { MAX_CHECKLISTS } from "../lib/types";
 import { Button, Badge, TextInput, Select } from "../components/ui";
 import { usePaywall } from "../components/Paywall";
+import { usePremium } from "../components/PremiumProvider";
 import { useToast } from "../components/Toast";
 import { clsx } from "../lib/format";
 
 export default function Checklist() {
   const checklists = useSelector((d) => d.checklists);
   const activeId = useSelector((d) => d.activeChecklistId);
-  const premium = useSelector((d) => d.license.premium);
+  const { premium } = usePremium();
   const openPaywall = usePaywall();
   const toast = useToast();
 
