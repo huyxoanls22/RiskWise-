@@ -186,7 +186,11 @@ export default function Calculator() {
             ) : (
               <>
                 <Field label="Mã (ticker)">
-                  <TextInput value={cryptoTicker} onChange={(e) => setCryptoTicker(e.target.value)} placeholder="VD: BTC/USDT, AAPL" />
+                  <TextInput
+                    value={cryptoTicker}
+                    onChange={(e) => setCryptoTicker(e.target.value.toUpperCase())}
+                    placeholder="VD: BTC/USDT, AAPL"
+                  />
                 </Field>
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Giá vào">

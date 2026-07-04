@@ -22,7 +22,7 @@ const BANK_INFO = {
 const SUPPORT_CONTACT = "adminriskwise@gmail.com";
 
 const PLANS = {
-  yearly: { label: "Gói năm", price: "999.000đ", amount: 999000, note: "~83.000đ/tháng · tiết kiệm 58%", best: true },
+  yearly: { label: "Gói năm", price: "1.999.000đ", amount: 1999000, note: "~167.000đ/tháng · tiết kiệm 16%", best: true },
   monthly: { label: "Gói tháng", price: "199.000đ", amount: 199000, note: "gia hạn từng tháng", best: false },
 } as const;
 type PlanId = keyof typeof PLANS;
