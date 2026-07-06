@@ -121,7 +121,30 @@ export interface PortfolioTrade {
   followedChecklist: boolean;
   /** False when the trade was entered despite exceeding the daily risk limit. Undefined = legacy/within limit. */
   withinDailyLimit?: boolean;
+  /** Industry/sector tag, for portfolio concentration analysis. Empty = "Chưa phân loại". */
+  sector?: string;
 }
+
+/** Curated sector/industry tags for portfolio exposure analysis (Vietnam-market flavoured). */
+export const SECTORS: string[] = [
+  "Ngân hàng",
+  "Chứng khoán",
+  "Bất động sản",
+  "Công nghệ",
+  "Sản xuất / Công nghiệp",
+  "Bán lẻ / Tiêu dùng",
+  "Năng lượng / Dầu khí",
+  "Nguyên vật liệu / Thép",
+  "Y tế / Dược",
+  "Tiện ích",
+  "Vận tải / Logistics",
+  "Crypto",
+  "Ngoại hối / Vàng",
+  "Khác",
+];
+
+/** Portfolio is flagged as over-concentrated when one sector holds at least this % of open risk. */
+export const SECTOR_CONCENTRATION_WARN = 40;
 
 export interface TradingPlan {
   id: string;

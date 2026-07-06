@@ -5,7 +5,7 @@ import { actions } from "../store/actions";
 import { calculatePositionSize, riskAmountOf } from "../lib/calculator";
 import { riskUsedToday } from "../lib/analytics";
 import { FOREX_PAIRS } from "../lib/forex";
-import { EMOTIONS } from "../lib/types";
+import { EMOTIONS, SECTORS } from "../lib/types";
 import type { Emotion } from "../lib/types";
 import { Card, Field, NumberInput, TextInput, Select, Segmented, Button, StatCard, Badge, Modal } from "../components/ui";
 import { useToast } from "../components/Toast";
@@ -22,6 +22,7 @@ export default function Calculator() {
   const toast = useToast();
   const [cryptoTicker, setCryptoTicker] = useState("BTC/USDT");
   const [emotion, setEmotion] = useState<Emotion>("calm");
+  const [sector, setSector] = useState("");
   const [overrideOpen, setOverrideOpen] = useState(false);
 
   const result = useMemo(() => calculatePositionSize(setup), [setup]);
@@ -78,6 +79,7 @@ export default function Calculator() {
       stopLoss: stop,
       takeProfit: tp || undefined,
       emotion,
+      sector: sector || undefined,
       followedChecklist: checklistComplete,
       withinDailyLimit: !exceedsDaily,
     });
@@ -206,9 +208,18 @@ export default function Calculator() {
               </>
             )}
 
-            <Field label="Tâm lý khi vào lệnh">
-              <Select value={emotion} onChange={(v) => setEmotion(v as Emotion)} options={EMOTIONS} />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Tâm lý khi vào lệnh">
+                <Select value={emotion} onChange={(v) => setEmotion(v as Emotion)} options={EMOTIONS} />
+              </Field>
+              <Field label="Ngành / nhóm" hint="Dùng để phân tích tập trung rủi ro theo ngành">
+                <Select
+                  value={sector}
+                  onChange={setSector}
+                  options={[{ value: "", label: "— Chưa phân loại —" }, ...SECTORS.map((s) => ({ value: s, label: s }))]}
+                />
+              </Field>
+            </div>
           </div>
         </Card>
 

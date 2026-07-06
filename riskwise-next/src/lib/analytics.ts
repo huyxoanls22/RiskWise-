@@ -103,6 +103,44 @@ export function riskUsedToday(trades: PortfolioTrade[], now: Date = new Date()):
     .reduce((s, t) => s + (t.riskAmount > 0 ? t.riskAmount : 0), 0);
 }
 
+export interface SectorExposure {
+  sector: string;
+  riskAmount: number; // total money at risk across open trades in this sector
+  notional: number; // total position value (entry × units)
+  count: number;
+  riskPct: number; // share of the portfolio's total open risk, 0..100
+}
+
+/**
+ * Open-position risk exposure grouped by sector, sorted largest-first. Lets the UI
+ * highlight over-concentration in a single industry. Untagged trades fall under
+ * "Chưa phân loại".
+ */
+export function sectorExposure(trades: PortfolioTrade[]): SectorExposure[] {
+  const open = trades.filter((t) => t.status === "active");
+  const totalRisk = open.reduce((s, t) => s + (t.riskAmount > 0 ? t.riskAmount : 0), 0);
+
+  const groups = new Map<string, { riskAmount: number; notional: number; count: number }>();
+  for (const t of open) {
+    const key = (t.sector ?? "").trim() || "Chưa phân loại";
+    const g = groups.get(key) ?? { riskAmount: 0, notional: 0, count: 0 };
+    g.riskAmount += t.riskAmount > 0 ? t.riskAmount : 0;
+    g.notional += Math.abs((t.entryPrice || 0) * (t.units || 0));
+    g.count += 1;
+    groups.set(key, g);
+  }
+
+  return [...groups.entries()]
+    .map(([sector, g]) => ({
+      sector,
+      riskAmount: g.riskAmount,
+      notional: g.notional,
+      count: g.count,
+      riskPct: totalRisk > 0 ? (g.riskAmount / totalRisk) * 100 : 0,
+    }))
+    .sort((a, b) => b.riskAmount - a.riskAmount || b.count - a.count);
+}
+
 /** Cumulative equity curve (net PnL over time) from closed trades. */
 export function equityCurve(trades: PortfolioTrade[]): { i: number; pnl: number; cumulative: number }[] {
   const c = closed(trades);

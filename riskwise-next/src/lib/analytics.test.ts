@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeDisciplineScore, computeStats, riskUsedToday } from "./analytics";
+import { computeDisciplineScore, computeStats, riskUsedToday, sectorExposure } from "./analytics";
 import type { PortfolioTrade } from "./types";
 
 const trade = (over: Partial<PortfolioTrade>): PortfolioTrade => ({
@@ -78,6 +78,34 @@ describe("computeStats sanity", () => {
   it("treats legacy trades without the withinDailyLimit flag as within the limit", () => {
     const stats = computeStats([trade({ followedChecklist: true, withinDailyLimit: undefined })]);
     expect(stats.disciplineRate).toBe(100);
+  });
+});
+
+describe("sectorExposure", () => {
+  it("groups open trades by sector, sorted by risk desc with correct percentages", () => {
+    const trades = [
+      trade({ status: "active", riskAmount: 300, sector: "Ngân hàng" }),
+      trade({ status: "active", riskAmount: 100, sector: "Ngân hàng" }),
+      trade({ status: "active", riskAmount: 100, sector: "Công nghệ" }),
+      trade({ status: "won", riskAmount: 999, sector: "Bất động sản" }), // closed → ignored
+    ];
+    const exp = sectorExposure(trades);
+    expect(exp).toHaveLength(2);
+    expect(exp[0].sector).toBe("Ngân hàng");
+    expect(exp[0].riskAmount).toBe(400);
+    expect(exp[0].count).toBe(2);
+    expect(Math.round(exp[0].riskPct)).toBe(80); // 400 / 500
+    expect(exp[1].sector).toBe("Công nghệ");
+    expect(Math.round(exp[1].riskPct)).toBe(20);
+  });
+
+  it("labels untagged trades as 'Chưa phân loại'", () => {
+    const exp = sectorExposure([trade({ status: "active", riskAmount: 50, sector: undefined })]);
+    expect(exp[0].sector).toBe("Chưa phân loại");
+  });
+
+  it("returns empty when there are no open trades", () => {
+    expect(sectorExposure([trade({ status: "won" })])).toEqual([]);
   });
 });
 
