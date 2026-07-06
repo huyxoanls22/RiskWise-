@@ -123,6 +123,8 @@ export interface PortfolioTrade {
   withinDailyLimit?: boolean;
   /** Industry/sector tag, for portfolio concentration analysis. Empty = "Chưa phân loại". */
   sector?: string;
+  /** Behavioural tilt score (0..100) at the moment of entry. */
+  tiltScore?: number;
 }
 
 /** Curated sector/industry tags for portfolio exposure analysis (Vietnam-market flavoured). */

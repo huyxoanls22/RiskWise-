@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Calculator as CalcIcon, TrendingUp, TrendingDown, PlusCircle, AlertTriangle, ShieldAlert, Lock } from "lucide-react";
+import { Calculator as CalcIcon, TrendingUp, TrendingDown, PlusCircle, AlertTriangle, ShieldAlert, Lock, Activity } from "lucide-react";
 import { useSelector } from "../store/store";
 import { actions } from "../store/actions";
 import { calculatePositionSize, riskAmountOf } from "../lib/calculator";
 import { riskUsedToday } from "../lib/analytics";
+import { assessTilt } from "../lib/tilt";
 import { FOREX_PAIRS } from "../lib/forex";
 import { EMOTIONS, SECTORS } from "../lib/types";
 import type { Emotion } from "../lib/types";
 import { Card, Field, NumberInput, TextInput, Select, Segmented, Button, StatCard, Badge, Modal } from "../components/ui";
 import { useToast } from "../components/Toast";
-import { fmtMoney, fmtNum, fmtPct } from "../lib/format";
+import { fmtMoney, fmtNum, fmtPct, clsx } from "../lib/format";
 import RiskMeter from "../components/RiskMeter";
 import Checklist from "./Checklist";
 import SavedSetups from "./SavedSetups";
@@ -58,6 +59,12 @@ export default function Calculator() {
       `Rủi ro trong ngày sẽ lên ${fmtPct(projectedRiskPct, 2)} — vượt giới hạn ${fmtPct(dailyLimitPercent, 1)}/ngày.`,
   ].filter(Boolean) as string[];
 
+  // Behavioural tilt — inferred from how the trader is acting (not self-reported).
+  const tilt = useMemo(() => assessTilt(trades, result.riskAmount), [trades, result.riskAmount]);
+  const suggestedEmotionLabel = tilt.suggestedEmotion
+    ? EMOTIONS.find((e) => e.value === tilt.suggestedEmotion)?.label
+    : undefined;
+
   const rr = result.riskRewardRatio;
   const rrTone = rr === undefined ? "neutral" : rr >= 2 ? "pos" : rr >= 1 ? "warn" : "neg";
 
@@ -80,6 +87,7 @@ export default function Calculator() {
       takeProfit: tp || undefined,
       emotion,
       sector: sector || undefined,
+      tiltScore: tilt.score,
       followedChecklist: checklistComplete,
       withinDailyLimit: !exceedsDaily,
     });
@@ -260,6 +268,41 @@ export default function Calculator() {
           {rr !== undefined && rr < 1 && (
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-neg/30 bg-neg/10 p-3 text-xs text-neg">
               <AlertTriangle className="h-4 w-4 shrink-0" /> R:R dưới 1 — phần thưởng nhỏ hơn rủi ro. Cân nhắc lại điểm chốt lời.
+            </div>
+          )}
+
+          {tilt.level !== "calm" && (
+            <div
+              className={clsx(
+                "mt-4 space-y-1.5 rounded-xl border p-3 text-xs",
+                tilt.level === "high" ? "border-neg/30 bg-neg/10 text-neg" : "border-warn/30 bg-warn/10 text-warn"
+              )}
+            >
+              <div className="flex items-center gap-2 font-semibold">
+                <Activity className="h-4 w-4 shrink-0" /> Trạng thái tâm lý: {tilt.label} ({tilt.score}/100)
+              </div>
+              <ul className="ml-6 list-disc space-y-0.5">
+                {tilt.reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              {tilt.suggestedEmotion && suggestedEmotionLabel && (
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <span>
+                    Có thể bạn đang: <span className="font-semibold">{suggestedEmotionLabel}</span>.
+                  </span>
+                  {emotion !== tilt.suggestedEmotion && (
+                    <button
+                      type="button"
+                      onClick={() => setEmotion(tilt.suggestedEmotion!)}
+                      className="rounded-md border border-current/40 px-2 py-0.5 font-medium transition hover:bg-current/10"
+                    >
+                      Ghi nhận
+                    </button>
+                  )}
+                </div>
+              )}
+              {tilt.level === "high" && <p className="pt-0.5">Cân nhắc nghỉ 10–15 phút trước khi quyết định.</p>}
             </div>
           )}
 
